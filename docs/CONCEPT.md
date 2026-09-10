@@ -375,6 +375,19 @@ Nach Abschluss landet der Nutzer auf dem leeren Dashboard mit einem prominenten 
 
 ## 8. UI-Spezifikation
 
+### 8.0 Design-Richtung
+
+Ziel ist ein cleanes, Notion-artiges Erscheinungsbild — kein dichtes Enterprise-Security-Dashboard mit vollgestopften Tabellen und Signalfarben überall. Konkret heißt das:
+
+- **Farbe fast ausschließlich neutral.** Weiß/sehr helles Grau als Grund, dunkles Grau für Text (kein reines Schwarz), ein einzelner dezenter Akzentton für interaktive Elemente (Buttons, Links). Gesättigte Farben (Rot/Orange/Gelb/Grün) sind ausschließlich für Severity- und Status-Indikatoren reserviert — dieselbe Logik wie in 8.1 „Card-Farbe = Dringlichkeit". Wenn Farbe überall vorkommt, verliert sie als Signal ihre Bedeutung.
+- **Weißraum statt Dichte.** Großzügiges Padding, klare Abstände zwischen Sektionen, Inhalte dürfen atmen. Nicht versuchen, möglichst viel Information pro Bildschirm unterzubringen.
+- **Dünne Trennlinien statt Schatten.** 1px-Borders in hellem Grau zur Abgrenzung von Cards/Sektionen, keine schweren `box-shadow`-Elevationen. Wenn überhaupt Schatten, dann sehr subtil (z. B. bei Dropdowns/Modals).
+- **Typografie.** Ein Sans-Serif-Font (System-UI-Stack oder Inter), klare Größenhierarchie, aber wenige Stufen. Großzügige Zeilenhöhe bei Fließtext.
+- **Reduziertes Chrome.** Keine unnötigen Icons, Badges oder Deko-Elemente. Jedes UI-Element muss eine Funktion haben — Content und Daten stehen im Vordergrund, nicht die Oberfläche selbst.
+- **Moderate, konsistente Eckenradien** auf Cards, Buttons und Inputs — weder scharfkantig noch stark abgerundet.
+
+Diese Richtlinien gelten für alle Ansichten (Dashboard, Detailseite, Setup-Wizard), nicht nur für die Startseite. Bei Rückfragen zur konkreten Umsetzung gilt: eher an Notion, Linear oder Vercel-Dashboard orientieren als an klassischen Security-Tools wie DefectDojo oder Dependency-Track.
+
 ### 8.1 Dashboard (Startseite)
 
 - Header mit **Import project**-Button und globalem Zustand (`X projects · last scan 3 minutes ago`)
