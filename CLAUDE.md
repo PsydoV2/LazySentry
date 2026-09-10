@@ -30,4 +30,4 @@ Erst `docs/CONCEPT.md` nach dem passenden Abschnitt durchsuchen, bevor eine Konv
 
 ## Implementierungsreihenfolge
 
-Nicht mit der UI anfangen. Die Reihenfolge steht in `docs/CONCEPT.md` Abschnitt 10 — jeder Schritt hat ein konkretes "fertig, wenn"-Kriterium. Schritte nicht überspringen, auch wenn ein späterer Schritt einfach erscheint.
+Nicht mit der UI anfangen. Die Reihenfolge steht in `docs/CONCEPT.md` Abschnitt 10 — jeder Schritt hat ein konkretes "fertig, wenn"-Kriterium. Schritte nicht überspringen, auch wenn ein späterer Schritt einfach erscheint. Regelmäßig committen für die Versionierung

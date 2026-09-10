@@ -1,0 +1,16 @@
+{
+  "name": "lazysentry",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Self-hosted security & maintenance dashboard for your repositories",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter \"./apps/*\" dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck"
+  }
+}
