@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
+import { requireAuth, requireSameOrigin } from '../auth/session.js';
 import { db } from '../db/client.js';
 import { projects, scans, vulnerabilities } from '../db/schema.js';
 import { conflict, notFound } from '../lib/errors.js';
@@ -21,11 +22,19 @@ function requireProjectId(rawParams: unknown): number {
 }
 
 export function registerProjectRoutes(app: FastifyInstance): void {
-  app.get('/api/projects', async () => {
+  app.get('/api/projects', async (request) => {
+    requireAuth(request);
     return db.select().from(projects).all();
   });
 
+  app.get('/api/projects/:id', async (request) => {
+    requireAuth(request);
+    const projectId = requireProjectId(request.params);
+    return db.select().from(projects).where(eq(projects.id, projectId)).get();
+  });
+
   app.get('/api/projects/:id/scans', async (request) => {
+    requireAuth(request);
     const projectId = requireProjectId(request.params);
     return db
       .select()
@@ -35,19 +44,39 @@ export function registerProjectRoutes(app: FastifyInstance): void {
       .all();
   });
 
-  app.post('/api/projects/:id/scans', async (request, reply) => {
+  app.post(
+    '/api/projects/:id/scans',
+    {
+      // Keeps a frontend bug or a hijacked session from flooding the worker
+      // with jobs (docs/CONCEPT.md 6.2).
+      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+    },
+    async (request, reply) => {
+      requireAuth(request);
+      requireSameOrigin(request);
+      const projectId = requireProjectId(request.params);
+      if (hasActiveScanJob(projectId)) {
+        throw conflict(
+          'SCAN_ALREADY_QUEUED',
+          'A scan for this project is already queued or running',
+        );
+      }
+      const job = enqueueScanJob({ projectId, trigger: 'manual' });
+      return reply.status(202).send({ jobId: job.id, status: job.status });
+    },
+  );
+
+  app.delete('/api/projects/:id', async (request, reply) => {
+    requireAuth(request);
+    requireSameOrigin(request);
     const projectId = requireProjectId(request.params);
-    if (hasActiveScanJob(projectId)) {
-      throw conflict(
-        'SCAN_ALREADY_QUEUED',
-        'A scan for this project is already queued or running',
-      );
-    }
-    const job = enqueueScanJob({ projectId, trigger: 'manual' });
-    return reply.status(202).send({ jobId: job.id, status: job.status });
+    // Scans, packages and findings cascade from the project row.
+    db.delete(projects).where(eq(projects.id, projectId)).run();
+    return reply.status(204).send();
   });
 
   app.get('/api/projects/:id/vulnerabilities', async (request) => {
+    requireAuth(request);
     const projectId = requireProjectId(request.params);
     return db
       .select()

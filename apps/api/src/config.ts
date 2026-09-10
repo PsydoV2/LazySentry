@@ -1,8 +1,8 @@
 // Central runtime configuration, loaded once from the environment.
-// APP_ENCRYPTION_KEY is validated here as soon as encrypted settings exist
-// (implementation step 3) — see docs/CONCEPT.md 4.2.
 
+import { hkdfSync } from 'node:crypto';
 import { z } from 'zod';
+import { EncryptionKeyError, parseEncryptionKey } from './lib/crypto.js';
 
 // Load a local .env in development; in production the environment is set by
 // the container runtime and the file does not exist. Checked in the current
@@ -25,6 +25,15 @@ const envSchema = z.object({
   // Docker image copies it to /usr/local/bin); for local development point
   // this at e.g. ./tools/osv-scanner.exe via .env.
   OSV_SCANNER_PATH: z.string().default('osv-scanner'),
+  // Set when the app is served over HTTPS, so session cookies get `Secure`.
+  HTTPS: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+  // Explicit origin allowed for state-changing requests (docs/CONCEPT.md 6.2
+  // CSRF). Only needed when a reverse proxy rewrites the Host header;
+  // otherwise Origin is checked against Host. Example: https://sentry.example.com
+  APP_ORIGIN: z.string().url().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -36,4 +45,25 @@ if (!parsed.success) {
   process.exit(1);
 }
 
-export const config = parsed.data;
+// The application refuses to start without a valid master key rather than
+// silently storing tokens in the clear (docs/CONCEPT.md 4.2).
+let encryptionKey: Buffer;
+try {
+  encryptionKey = parseEncryptionKey(process.env.APP_ENCRYPTION_KEY);
+} catch (error) {
+  if (error instanceof EncryptionKeyError) {
+    console.error(`\nLazySentry cannot start.\n\n${error.message}\n`);
+    process.exit(1);
+  }
+  throw error;
+}
+
+export const config = {
+  ...parsed.data,
+  encryptionKey,
+  // Derived from the master key so self-hosters have one secret to manage.
+  // HKDF with a distinct info label keeps it independent of the data key.
+  sessionSecret: Buffer.from(
+    hkdfSync('sha256', encryptionKey, '', 'lazysentry:session', 32),
+  ).toString('hex'),
+};

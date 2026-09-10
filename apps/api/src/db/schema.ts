@@ -11,6 +11,34 @@ import {
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core';
 
+/** Single admin account (docs/CONCEPT.md 6.1: no multi-user in the MVP). */
+export const users = sqliteTable('users', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  username: text('username').notNull().unique(),
+  passwordHash: text('password_hash').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  lastLoginAt: integer('last_login_at', { mode: 'timestamp_ms' }),
+});
+
+export const settings = sqliteTable('settings', {
+  key: text('key').primaryKey(),
+  valueEncrypted: text('value_encrypted').notNull(),
+  isSecret: integer('is_secret', { mode: 'boolean' }).notNull().default(false),
+});
+
+export const gitAccounts = sqliteTable('git_accounts', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  provider: text('provider').notNull(), // 'github' only in the MVP
+  username: text('username').notNull(),
+  tokenEncrypted: text('token_encrypted').notNull(),
+  tokenScopes: text('token_scopes', { mode: 'json' }).$type<string[]>(),
+  // 'valid' | 'invalid' — set to 'invalid' when a clone fails with 401/403
+  // so the UI can prompt for reconnect (docs/CONCEPT.md 6.2).
+  status: text('status').notNull().default('valid'),
+  connectedAt: integer('connected_at', { mode: 'timestamp_ms' }).notNull(),
+  lastValidatedAt: integer('last_validated_at', { mode: 'timestamp_ms' }),
+});
+
 export const jobs = sqliteTable(
   'jobs',
   {
@@ -35,39 +63,53 @@ export interface ScanJobPayload {
   trigger: 'manual' | 'scheduled';
 }
 
-export const projects = sqliteTable('projects', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  // References git_accounts.id once GitHub connect exists (step 3);
-  // null for now while step 1 works with a hardcoded repository.
-  gitAccountId: integer('git_account_id'),
-  providerRepoId: text('provider_repo_id'),
-  name: text('name').notNull(),
-  fullName: text('full_name').notNull(),
-  defaultBranch: text('default_branch'),
-  cloneUrl: text('clone_url').notNull(),
-  isPrivate: integer('is_private', { mode: 'boolean' }).notNull().default(false),
-  addedAt: integer('added_at', { mode: 'timestamp_ms' }).notNull(),
-  scanSecretsEnabled: integer('scan_secrets_enabled', { mode: 'boolean' })
-    .notNull()
-    .default(true),
-  verifySecretsEnabled: integer('verify_secrets_enabled', { mode: 'boolean' })
-    .notNull()
-    .default(true),
-  // Denormalized counters for the dashboard grid.
-  lastScanId: integer('last_scan_id'),
-  lastScanAt: integer('last_scan_at', { mode: 'timestamp_ms' }),
-  lastScanStatus: text('last_scan_status'),
-  countVulnCritical: integer('count_vuln_critical').notNull().default(0),
-  countVulnHigh: integer('count_vuln_high').notNull().default(0),
-  countVulnMedium: integer('count_vuln_medium').notNull().default(0),
-  countVulnLow: integer('count_vuln_low').notNull().default(0),
-  countSecretsVerified: integer('count_secrets_verified').notNull().default(0),
-  countSecretsUnknown: integer('count_secrets_unknown').notNull().default(0),
-  countOutdatedMajor: integer('count_outdated_major').notNull().default(0),
-  countOutdatedMinor: integer('count_outdated_minor').notNull().default(0),
-  countOutdatedPatch: integer('count_outdated_patch').notNull().default(0),
-  lastScannedCommitSha: text('last_scanned_commit_sha'),
-});
+export const projects = sqliteTable(
+  'projects',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    // Null only for the hardcoded step-1 development project.
+    gitAccountId: integer('git_account_id').references(() => gitAccounts.id, {
+      onDelete: 'cascade',
+    }),
+    providerRepoId: text('provider_repo_id'),
+    name: text('name').notNull(),
+    fullName: text('full_name').notNull(),
+    defaultBranch: text('default_branch'),
+    cloneUrl: text('clone_url').notNull(),
+    isPrivate: integer('is_private', { mode: 'boolean' })
+      .notNull()
+      .default(false),
+    addedAt: integer('added_at', { mode: 'timestamp_ms' }).notNull(),
+    scanSecretsEnabled: integer('scan_secrets_enabled', { mode: 'boolean' })
+      .notNull()
+      .default(true),
+    verifySecretsEnabled: integer('verify_secrets_enabled', { mode: 'boolean' })
+      .notNull()
+      .default(true),
+    // Denormalized counters for the dashboard grid.
+    lastScanId: integer('last_scan_id'),
+    lastScanAt: integer('last_scan_at', { mode: 'timestamp_ms' }),
+    lastScanStatus: text('last_scan_status'),
+    countVulnCritical: integer('count_vuln_critical').notNull().default(0),
+    countVulnHigh: integer('count_vuln_high').notNull().default(0),
+    countVulnMedium: integer('count_vuln_medium').notNull().default(0),
+    countVulnLow: integer('count_vuln_low').notNull().default(0),
+    countSecretsVerified: integer('count_secrets_verified').notNull().default(0),
+    countSecretsUnknown: integer('count_secrets_unknown').notNull().default(0),
+    countOutdatedMajor: integer('count_outdated_major').notNull().default(0),
+    countOutdatedMinor: integer('count_outdated_minor').notNull().default(0),
+    countOutdatedPatch: integer('count_outdated_patch').notNull().default(0),
+    lastScannedCommitSha: text('last_scanned_commit_sha'),
+  },
+  (table) => [
+    // A repository is imported once per connected account; a second import
+    // is a 409 conflict, not a duplicate row.
+    uniqueIndex('projects_account_repo_unique').on(
+      table.gitAccountId,
+      table.providerRepoId,
+    ),
+  ],
+);
 
 export const scans = sqliteTable(
   'scans',

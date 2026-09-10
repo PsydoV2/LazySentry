@@ -27,7 +27,25 @@ sqlite.pragma('foreign_keys = ON');
 export const db = drizzle(sqlite, { schema });
 
 export function runMigrations(): void {
-  migrate(db, { migrationsFolder });
+  // SQLite cannot change the foreign_keys pragma inside a transaction, and
+  // the migrator wraps every migration in one. Since a column change makes
+  // Drizzle rebuild the table (create new → copy → DROP old → rename), an
+  // enabled foreign_keys pragma turns that DROP into a cascading delete of
+  // every child row. Disabling it here — outside the transaction — is what
+  // keeps an upgrade from wiping scans and findings (docs/CONCEPT.md 3.3).
+  sqlite.pragma('foreign_keys = OFF');
+  try {
+    migrate(db, { migrationsFolder });
+
+    const violations = sqlite.pragma('foreign_key_check') as unknown[];
+    if (violations.length > 0) {
+      throw new Error(
+        `Migration left ${violations.length} foreign key violation(s); database not modified further`,
+      );
+    }
+  } finally {
+    sqlite.pragma('foreign_keys = ON');
+  }
 }
 
 /** Closes the database handle — for graceful shutdown and tests. */

@@ -77,9 +77,9 @@ export function registerErrorHandler(app: FastifyInstance): void {
     });
   });
 
-  app.setNotFoundHandler((_request, reply) => {
-    reply
-      .status(404)
-      .send({ error: { code: 'NOT_FOUND', message: 'Resource not found' } });
-  });
 }
+
+/** The 404 body for API routes, shared by both not-found handlers. */
+export const NOT_FOUND_BODY = {
+  error: { code: 'NOT_FOUND', message: 'Resource not found' },
+} as const;

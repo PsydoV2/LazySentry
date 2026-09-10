@@ -6,7 +6,17 @@ import { db } from '../db/client.js';
 import { packages, projects, scans, vulnerabilities } from '../db/schema.js';
 import { vulnerabilityFingerprint } from '../lib/fingerprint.js';
 import { classifySeverity } from '../lib/severity.js';
-import { cloneRepository, newScanDir, removeScanDir } from '../scanner/clone.js';
+import {
+  getAccountToken,
+  getGitAccount,
+  markAccountInvalid,
+} from '../accounts/git-accounts.js';
+import {
+  CloneError,
+  cloneRepository,
+  newScanDir,
+  removeScanDir,
+} from '../scanner/clone.js';
 import {
   runOsvScanner,
   type OsvPackageEntry,
@@ -52,7 +62,22 @@ export async function runScan(
 
   const scanDir = newScanDir();
   try {
-    ({ commitSha } = await cloneRepository(project.cloneUrl, scanDir));
+    // Private repositories need the connected account's token; the hardcoded
+    // development project has no account and clones anonymously.
+    const account = project.gitAccountId === null ? undefined : getGitAccount();
+    const token = account ? getAccountToken(account) : undefined;
+
+    try {
+      ({ commitSha } = await cloneRepository(project.cloneUrl, scanDir, token));
+    } catch (cloneError) {
+      // A revoked token affects every project, so flag the account instead of
+      // only this scan — the UI then asks for a reconnect (CONCEPT 6.2).
+      if (cloneError instanceof CloneError && cloneError.isAuthFailure && account) {
+        markAccountInvalid(account.id);
+        errorCode = 'ACCOUNT_TOKEN_INVALID';
+      }
+      throw cloneError;
+    }
     db.update(scans).set({ commitSha }).where(eq(scans.id, scanId)).run();
 
     const osv = await runOsvScanner(scanDir);

@@ -1,0 +1,378 @@
+/* Design system per docs/CONCEPT.md 8.0: near-neutral palette, generous
+   whitespace, thin borders instead of shadows, one restrained accent.
+   Saturated colors are reserved for severity and status signals — if color
+   is everywhere it stops meaning anything. */
+
+:root {
+  --bg: #fbfbfb; /* Komplett cleanes, helles Off-White */
+  --surface: #ffffff; /* Schneeweiß für Karten und Boxen */
+  --border: #f1f1f0; /* Extrem dezente Notion-Border für Tabellen/Linien */
+  --border-strong: #e1e1e0; /* Für fokussierte Inputs oder Trennlinien */
+
+  --text: #1a1a1a; /* Airbnb-Standard für maximal lesbaren Text */
+  --text-muted: #5f5e5b; /* Für sekundäre Texte und Beschreibungen */
+  --text-subtle: #908e89; /* Für Datumsangaben oder Tabellen-Header */
+
+  --accent: #7c3aed; /* Kraftvolles, cleanes Violett */
+  --accent-hover: #6d28d9; /* Dunkleres Violett für Hover-Effekte */
+  --accent-subtle: #f5f3ff; /* Sehr softes Violett-Weiß */
+
+  --signal-critical: #df2c2c; /* Strahlendes, gefährliches Rot */
+  --signal-high: #f59e0b; /* Klares, warnendes Orange */
+  --signal-medium: #eab308; /* Reines Gelb für mittlere Warnungen */
+  --signal-info: #0284c7; /* Ein helles, klares Info-Blau (getrennt vom Core-Accent!) */
+  --signal-ok: #10b981; /* Frisches, beruhigendes SaaS-Grün */
+
+  --radius: 6px;
+  --radius-lg: 8px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  --font:
+    ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+h1 {
+  font-size: 22px;
+}
+h2 {
+  font-size: 17px;
+}
+h3 {
+  font-size: 14px;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+/* ---------- layout ---------- */
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-6);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.app-header .brand {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: var(--space-6);
+}
+
+.centered-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-5);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.spread {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+/* ---------- surfaces ---------- */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+}
+
+.panel {
+  width: 100%;
+  max-width: 440px;
+}
+
+.divider {
+  height: 1px;
+  background: var(--border);
+  border: 0;
+  margin: var(--space-4) 0;
+}
+
+/* ---------- typography helpers ---------- */
+
+.muted {
+  color: var(--text-muted);
+}
+
+.subtle {
+  color: var(--text-subtle);
+  font-size: 13px;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+/* ---------- forms ---------- */
+
+label {
+  display: block;
+  font-weight: 500;
+  margin-bottom: var(--space-1);
+}
+
+input[type="text"],
+input[type="password"],
+input[type="search"] {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+input:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.field-hint {
+  margin-top: var(--space-1);
+  color: var(--text-subtle);
+  font-size: 13px;
+}
+
+button {
+  font: inherit;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  padding: 7px 14px;
+  cursor: pointer;
+  background: transparent;
+  color: var(--text);
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 500;
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.btn-secondary {
+  border-color: var(--border-strong);
+  background: var(--surface);
+}
+.btn-secondary:hover:not(:disabled) {
+  background: var(--bg);
+}
+
+.btn-quiet {
+  color: var(--text-muted);
+  padding: 4px 8px;
+}
+.btn-quiet:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--bg);
+}
+
+/* ---------- messages ---------- */
+
+.notice {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.notice-error {
+  border-color: #e6c9c4;
+  background: #fdf5f4;
+  color: #8f2e22;
+}
+
+.notice-warning {
+  border-color: #ecd9b0;
+  background: #fdf9ef;
+  color: #8a6212;
+}
+
+.notice-info {
+  border-color: #cddced;
+  background: var(--accent-subtle);
+  color: #2c5580;
+}
+
+/* ---------- lists ---------- */
+
+.list {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.list-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.list-row:last-child {
+  border-bottom: 0;
+}
+
+.list-row.is-disabled {
+  color: var(--text-subtle);
+  background: var(--bg);
+}
+
+.empty-state {
+  padding: var(--space-7) var(--space-5);
+  text-align: center;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+/* ---------- dialog ---------- */
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgb(32 30 28 / 32%);
+  display: grid;
+  place-items: center;
+  padding: var(--space-5);
+  z-index: 10;
+}
+
+.dialog {
+  width: 100%;
+  max-width: 620px;
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  /* The one place a shadow is warranted: a layer floating above the page. */
+  box-shadow: 0 8px 28px rgb(32 30 28 / 12%);
+}
+
+.dialog-header,
+.dialog-footer {
+  padding: var(--space-4) var(--space-5);
+}
+
+.dialog-header {
+  border-bottom: 1px solid var(--border);
+}
+
+.dialog-footer {
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.dialog-body {
+  padding: var(--space-4) var(--space-5);
+  overflow-y: auto;
+}
+
+/* ---------- steps ---------- */
+
+.steps {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  color: var(--text-subtle);
+  font-size: 13px;
+}
+
+.step-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--border-strong);
+}
+
+.step-dot.is-active {
+  background: var(--accent);
+}
