@@ -2,13 +2,17 @@
 // the built React app. See docs/CONCEPT.md 0.2 for the process model.
 
 import Fastify from 'fastify';
+import { config } from './config.js';
+import { runMigrations } from './db/client.js';
+import { registerProjectRoutes } from './routes/projects.js';
 
-const HOST = process.env.HOST ?? '127.0.0.1';
-const PORT = Number(process.env.PORT ?? 3000);
+runMigrations();
 
 const app = Fastify({ logger: true });
 
 app.get('/api/health', async () => ({ status: 'ok' }));
+
+registerProjectRoutes(app);
 
 app.setErrorHandler((error, _request, reply) => {
   app.log.error(error);
@@ -24,7 +28,7 @@ app.setNotFoundHandler((_request, reply) => {
 });
 
 try {
-  await app.listen({ host: HOST, port: PORT });
+  await app.listen({ host: config.HOST, port: config.PORT });
 } catch (error) {
   app.log.error(error);
   process.exit(1);

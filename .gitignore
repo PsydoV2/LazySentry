@@ -19,6 +19,12 @@ data/
 # Test & tooling
 coverage/
 
+# Local scanner binaries for development (baked into the Docker image in prod)
+tools/
+
+# Playwright MCP artifacts
+.playwright-mcp/
+
 # OS / editor noise
 .DS_Store
 Thumbs.db
