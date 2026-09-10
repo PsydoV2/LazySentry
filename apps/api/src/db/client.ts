@@ -29,3 +29,8 @@ export const db = drizzle(sqlite, { schema });
 export function runMigrations(): void {
   migrate(db, { migrationsFolder });
 }
+
+/** Closes the database handle — for graceful shutdown and tests. */
+export function closeDb(): void {
+  sqlite.close();
+}

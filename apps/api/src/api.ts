@@ -4,28 +4,37 @@
 import Fastify from 'fastify';
 import { config } from './config.js';
 import { runMigrations } from './db/client.js';
+import { AppError, registerErrorHandler } from './lib/errors.js';
 import { registerProjectRoutes } from './routes/projects.js';
 
 runMigrations();
 
 const app = Fastify({ logger: true });
 
+// Trigger endpoints (e.g. "run scan now") carry no payload, and a POST
+// without a Content-Type header would otherwise be rejected as 415. This
+// catch-all runs only after the JSON parser, so it accepts bodiless requests
+// and still rejects an unsupported content type that does carry a body.
+app.addContentTypeParser('*', (request, payload, done) => {
+  const contentLength = request.headers['content-length'];
+  if (contentLength === undefined || contentLength === '0') {
+    payload.resume();
+    done(null, undefined);
+    return;
+  }
+  done(
+    new AppError(
+      415,
+      'UNSUPPORTED_MEDIA_TYPE',
+      `Unsupported content type: ${request.headers['content-type'] ?? 'none'}`,
+    ),
+  );
+});
+
 app.get('/api/health', async () => ({ status: 'ok' }));
 
 registerProjectRoutes(app);
-
-app.setErrorHandler((error, _request, reply) => {
-  app.log.error(error);
-  reply.status(500).send({
-    error: { code: 'INTERNAL_ERROR', message: 'Internal server error' },
-  });
-});
-
-app.setNotFoundHandler((_request, reply) => {
-  reply.status(404).send({
-    error: { code: 'NOT_FOUND', message: 'Resource not found' },
-  });
-});
+registerErrorHandler(app);
 
 try {
   await app.listen({ host: config.HOST, port: config.PORT });

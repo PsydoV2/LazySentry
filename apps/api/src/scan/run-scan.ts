@@ -5,6 +5,7 @@ import { and, eq, ne, sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { packages, projects, scans, vulnerabilities } from '../db/schema.js';
 import { vulnerabilityFingerprint } from '../lib/fingerprint.js';
+import { classifySeverity } from '../lib/severity.js';
 import { cloneRepository, newScanDir, removeScanDir } from '../scanner/clone.js';
 import {
   runOsvScanner,
@@ -220,16 +221,6 @@ function updateProjectAfterScan(
     })
     .where(eq(projects.id, projectId))
     .run();
-}
-
-function classifySeverity(
-  cvssScore: number | null,
-): 'critical' | 'high' | 'medium' | 'low' | 'unknown' {
-  if (cvssScore === null) return 'unknown';
-  if (cvssScore >= 9) return 'critical';
-  if (cvssScore >= 7) return 'high';
-  if (cvssScore >= 4) return 'medium';
-  return 'low';
 }
 
 /** Numeric CVSS score from the result group containing this vulnerability. */

@@ -3,7 +3,7 @@
 // arrives with step 3 and will use GIT_ASKPASS, never the URL or argv.
 
 import { randomUUID } from 'node:crypto';
-import { rm } from 'node:fs/promises';
+import { readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execute } from './exec.js';
@@ -48,4 +48,24 @@ export async function cloneRepository(
 
 export async function removeScanDir(dir: string): Promise<void> {
   await rm(dir, { recursive: true, force: true, maxRetries: 3 });
+}
+
+/**
+ * Removes scan directories left behind by a crashed worker. Called at worker
+ * startup (docs/CONCEPT.md 0.3): with a single worker and concurrency 1, any
+ * existing scan-* directory is an orphan at that point.
+ */
+export async function cleanupOrphanedScanDirs(): Promise<string[]> {
+  const base = tmpdir();
+  let entries: string[];
+  try {
+    entries = await readdir(base);
+  } catch {
+    return [];
+  }
+  const orphans = entries.filter((name) => name.startsWith(SCAN_DIR_PREFIX));
+  for (const name of orphans) {
+    await removeScanDir(path.join(base, name));
+  }
+  return orphans;
 }

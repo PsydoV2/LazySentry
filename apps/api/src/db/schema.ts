@@ -11,6 +11,30 @@ import {
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core';
 
+export const jobs = sqliteTable(
+  'jobs',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    type: text('type').notNull(), // 'scan'
+    payload: text('payload', { mode: 'json' }).$type<ScanJobPayload>().notNull(),
+    // 'pending' | 'running' | 'done' | 'failed'
+    status: text('status').notNull().default('pending'),
+    attempts: integer('attempts').notNull().default(0),
+    maxAttempts: integer('max_attempts').notNull().default(3),
+    lockedAt: integer('locked_at', { mode: 'timestamp_ms' }),
+    lockedBy: text('locked_by'),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    finishedAt: integer('finished_at', { mode: 'timestamp_ms' }),
+    errorMessage: text('error_message'),
+  },
+  (table) => [index('jobs_status_idx').on(table.status)],
+);
+
+export interface ScanJobPayload {
+  projectId: number;
+  trigger: 'manual' | 'scheduled';
+}
+
 export const projects = sqliteTable('projects', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   // References git_accounts.id once GitHub connect exists (step 3);
