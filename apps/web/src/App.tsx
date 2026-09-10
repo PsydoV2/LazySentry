@@ -46,12 +46,20 @@ export function App() {
 
   const invalidateAll = () => queryClient.invalidateQueries();
 
-  if (setup.data && !setup.data.complete) {
+  // Without an admin account the instance is unclaimed, and the wizard is the
+  // only way in (docs/CONCEPT.md 6.2).
+  if (setup.data && !setup.data.adminAccountExists) {
     return <SetupWizard status={setup.data} onComplete={invalidateAll} />;
   }
 
+  // Once that account exists, everything else is behind the login — including
+  // the rest of the wizard, whose endpoints require a session.
   if (!session.data) {
     return <Login onSignedIn={invalidateAll} />;
+  }
+
+  if (setup.data && !setup.data.complete) {
+    return <SetupWizard status={setup.data} onComplete={invalidateAll} />;
   }
 
   return <Dashboard user={session.data} onSignedOut={invalidateAll} />;
