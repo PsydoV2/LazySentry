@@ -1,0 +1,251 @@
+// Dependencies tab (docs/CONCEPT.md 8.2): package inventory with CVE status
+// and update classification, filterable and sortable, direct vs transitive
+// visibly separated.
+
+import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { api, type PackageEntry, type Project, type Vulnerability } from '../lib/api';
+
+type SortKey = 'name' | 'ecosystem' | 'versionInstalled' | 'updateType';
+
+const UPDATE_LABEL: Record<PackageEntry['updateType'], string> = {
+  none: 'up to date',
+  patch: 'patch',
+  minor: 'minor',
+  major: 'major',
+  unknown: 'unknown',
+};
+
+const UPDATE_PILL: Record<PackageEntry['updateType'], string> = {
+  none: 'pill-ok',
+  patch: 'pill-ok',
+  minor: 'pill-info',
+  major: 'pill-high',
+  unknown: 'pill-neutral',
+};
+
+const SEVERITY_PILL: Record<Vulnerability['severity'], string> = {
+  critical: 'pill-critical',
+  high: 'pill-high',
+  medium: 'pill-medium',
+  low: 'pill-info',
+  unknown: 'pill-neutral',
+};
+
+export function DependenciesTab({ project }: { project: Project }) {
+  const projectId = project.id;
+  const [search, setSearch] = useState('');
+  const [ecosystem, setEcosystem] = useState('');
+  const [directOnly, setDirectOnly] = useState(false);
+  const [sortKey, setSortKey] = useState<SortKey>('name');
+  const [expanded, setExpanded] = useState<number | null>(null);
+
+  const packages = useQuery({
+    queryKey: ['project', projectId, 'packages'],
+    queryFn: () => api.get<PackageEntry[]>(`/api/projects/${projectId}/packages`),
+  });
+
+  const vulnerabilities = useQuery({
+    queryKey: ['project', projectId, 'vulnerabilities'],
+    queryFn: () =>
+      api.get<Vulnerability[]>(`/api/projects/${projectId}/vulnerabilities`),
+  });
+
+  const vulnsByPackage = useMemo(() => {
+    const map = new Map<string, Vulnerability[]>();
+    for (const vuln of vulnerabilities.data ?? []) {
+      if (vuln.status !== 'open') continue;
+      const key = `${vuln.packageEcosystem ?? ''}::${vuln.packageName ?? ''}`;
+      const list = map.get(key) ?? [];
+      list.push(vuln);
+      map.set(key, list);
+    }
+    return map;
+  }, [vulnerabilities.data]);
+
+  const ecosystems = useMemo(
+    () => [...new Set((packages.data ?? []).map((pkg) => pkg.ecosystem))].sort(),
+    [packages.data],
+  );
+
+  const rows = useMemo(() => {
+    const filtered = (packages.data ?? []).filter((pkg) => {
+      if (directOnly && !pkg.isDirect) return false;
+      if (ecosystem && pkg.ecosystem !== ecosystem) return false;
+      if (search && !pkg.name.toLowerCase().includes(search.toLowerCase())) {
+        return false;
+      }
+      return true;
+    });
+    return [...filtered].sort((a, b) => {
+      if (sortKey === 'updateType') {
+        return updateRank(b.updateType) - updateRank(a.updateType);
+      }
+      return String(a[sortKey]).localeCompare(String(b[sortKey]));
+    });
+  }, [packages.data, directOnly, ecosystem, search, sortKey]);
+
+  if (packages.isLoading) return <p className="muted">Loading…</p>;
+
+  if ((packages.data ?? []).length === 0) {
+    // An empty inventory means different things depending on why there is
+    // no finished scan to show — "no lockfiles" only when one actually ran
+    // and looked (docs/CONCEPT.md 5.7: never claim a clean result for a scan
+    // that never happened).
+    const message =
+      project.lastScanId === null
+        ? 'This project has not been scanned yet.'
+        : project.lastScanStatus === 'failed'
+          ? 'The last scan failed before dependencies could be scanned.'
+          : 'No supported lockfiles found — dependency scanning skipped.';
+    return <p className="muted">{message}</p>;
+  }
+
+  return (
+    <div className="stack">
+      <div className="row">
+        <input
+          type="search"
+          placeholder="Filter by package name…"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          style={{ maxWidth: 240 }}
+        />
+        <select value={ecosystem} onChange={(event) => setEcosystem(event.target.value)}>
+          <option value="">All ecosystems</option>
+          {ecosystems.map((eco) => (
+            <option key={eco} value={eco}>
+              {eco}
+            </option>
+          ))}
+        </select>
+        <label className="row" style={{ gap: 6 }}>
+          <input
+            type="checkbox"
+            checked={directOnly}
+            onChange={(event) => setDirectOnly(event.target.checked)}
+          />
+          Direct only
+        </label>
+      </div>
+
+      <div className="list">
+        <div className="data-table-header">
+          <SortableHeader label="Package" active={sortKey === 'name'} onClick={() => setSortKey('name')} />
+          <SortableHeader
+            label="Ecosystem"
+            active={sortKey === 'ecosystem'}
+            onClick={() => setSortKey('ecosystem')}
+          />
+          <span>Installed</span>
+          <span>Latest</span>
+          <SortableHeader
+            label="Update"
+            active={sortKey === 'updateType'}
+            onClick={() => setSortKey('updateType')}
+          />
+          <span>Vulnerabilities</span>
+        </div>
+
+        {rows.map((pkg) => {
+          const key = `${pkg.ecosystem}::${pkg.name}`;
+          const vulns = vulnsByPackage.get(key) ?? [];
+          const isExpanded = expanded === pkg.id;
+          return (
+            <div key={pkg.id}>
+              <button
+                type="button"
+                className="data-table-row"
+                onClick={() => setExpanded(isExpanded ? null : pkg.id)}
+                disabled={vulns.length === 0}
+              >
+                <span>
+                  {pkg.name}
+                  {!pkg.isDirect && <span className="subtle"> · transitive</span>}
+                  {pkg.sourceFile && <span className="subtle"> · {pkg.sourceFile}</span>}
+                </span>
+                <span className="subtle">{pkg.ecosystem}</span>
+                <span className="mono">{pkg.versionInstalled}</span>
+                <span className="mono">{pkg.versionLatest ?? '—'}</span>
+                <span>
+                  <span className={`pill ${UPDATE_PILL[pkg.updateType]}`}>
+                    {UPDATE_LABEL[pkg.updateType]}
+                  </span>
+                </span>
+                <span>
+                  {vulns.length > 0 ? (
+                    <span className={`pill ${SEVERITY_PILL[highestSeverity(vulns)]}`}>
+                      {vulns.length} CVE{vulns.length === 1 ? '' : 's'}
+                    </span>
+                  ) : (
+                    <span className="subtle">none</span>
+                  )}
+                </span>
+              </button>
+
+              {isExpanded && vulns.length > 0 && (
+                <div className="vuln-details stack">
+                  {vulns.map((vuln) => (
+                    <div key={vuln.id} className="vuln-detail-row">
+                      <span className={`pill ${SEVERITY_PILL[vuln.severity]}`}>
+                        {vuln.severity}
+                      </span>
+                      <div className="stack" style={{ gap: 2, flex: 1 }}>
+                        <span>
+                          <a
+                            href={`https://osv.dev/vulnerability/${encodeURIComponent(vuln.osvId)}`}
+                            target="_blank"
+                            rel="noreferrer noopener"
+                          >
+                            {vuln.osvId}
+                          </a>
+                          {vuln.aliases.length > 0 && (
+                            <span className="subtle"> · {vuln.aliases.join(', ')}</span>
+                          )}
+                        </span>
+                        {vuln.summary && <span className="muted">{vuln.summary}</span>}
+                        <span className="subtle">
+                          {vuln.fixedVersion
+                            ? `Fixed in ${vuln.fixedVersion}`
+                            : 'No fixed version published yet'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function SortableHeader({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button type="button" className={`sort-header ${active ? 'is-active' : ''}`} onClick={onClick}>
+      {label}
+    </button>
+  );
+}
+
+function updateRank(type: PackageEntry['updateType']): number {
+  return { major: 3, minor: 2, patch: 1, unknown: 0, none: -1 }[type];
+}
+
+function highestSeverity(vulns: Vulnerability[]): Vulnerability['severity'] {
+  const order: Vulnerability['severity'][] = ['critical', 'high', 'medium', 'low', 'unknown'];
+  for (const severity of order) {
+    if (vulns.some((vuln) => vuln.severity === severity)) return severity;
+  }
+  return 'unknown';
+}

@@ -52,6 +52,13 @@ describe('response mapping', () => {
     expect(dto.scanState).toBe('queued');
   });
 
+  it('carries the last scan error message only when the caller provides it', () => {
+    expect(toProjectDto(projectRow, 'idle').lastScanErrorMessage).toBeNull();
+    expect(
+      toProjectDto(projectRow, 'idle', 'clone failed: 401').lastScanErrorMessage,
+    ).toBe('clone failed: 401');
+  });
+
   it('never exposes the clone url or account id of a project', () => {
     const dto = toProjectDto(projectRow, 'idle') as Record<string, unknown>;
     expect(dto['cloneUrl']).toBeUndefined();

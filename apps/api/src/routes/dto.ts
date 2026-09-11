@@ -29,7 +29,14 @@ type SecretRow = typeof secrets.$inferSelect;
 const ms = (value: Date | null | undefined): number | null =>
   value ? value.getTime() : null;
 
-export function toProjectDto(row: ProjectRow, scanState: ScanState): Project {
+export function toProjectDto(
+  row: ProjectRow,
+  scanState: ScanState,
+  // Comes from a join on lastScanId, not a column on `projects` itself —
+  // the failure reason of a finished scan lives on `scans` (8.1 "failed
+  // (mit Grund im Tooltip)").
+  lastScanErrorMessage: string | null = null,
+): Project {
   return {
     id: row.id,
     name: row.name,
@@ -43,6 +50,7 @@ export function toProjectDto(row: ProjectRow, scanState: ScanState): Project {
     lastScanId: row.lastScanId,
     lastScanAt: ms(row.lastScanAt),
     lastScanStatus: row.lastScanStatus as Project['lastScanStatus'],
+    lastScanErrorMessage,
     countVulnCritical: row.countVulnCritical,
     countVulnHigh: row.countVulnHigh,
     countVulnMedium: row.countVulnMedium,

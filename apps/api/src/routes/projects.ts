@@ -52,21 +52,40 @@ function requireProject(rawParams: unknown): ProjectRow {
   return project;
 }
 
+/** Row shape shared by the list and single-project queries below. */
+function selectProjectsWithLastScanError() {
+  return db
+    .select({ project: projects, lastScanErrorMessage: scans.errorMessage })
+    .from(projects)
+    .leftJoin(scans, eq(projects.lastScanId, scans.id));
+}
+
 export function registerProjectRoutes(app: FastifyInstance): void {
   app.get('/api/projects', async (request) => {
     requireAuth(request);
     const states = scanStatesByProject();
-    return db
-      .select()
-      .from(projects)
+    return selectProjectsWithLastScanError()
       .all()
-      .map((row) => toProjectDto(row, states.get(row.id) ?? 'idle'));
+      .map((row) =>
+        toProjectDto(
+          row.project,
+          states.get(row.project.id) ?? 'idle',
+          row.lastScanErrorMessage,
+        ),
+      );
   });
 
   app.get('/api/projects/:id', async (request) => {
     requireAuth(request);
     const project = requireProject(request.params);
-    return toProjectDto(project, scanStateFor(project.id));
+    const row = selectProjectsWithLastScanError()
+      .where(eq(projects.id, project.id))
+      .get();
+    return toProjectDto(
+      project,
+      scanStateFor(project.id),
+      row?.lastScanErrorMessage ?? null,
+    );
   });
 
   app.patch('/api/projects/:id', async (request) => {

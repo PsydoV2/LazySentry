@@ -136,6 +136,8 @@ export interface Project {
   lastScanId: number | null;
   lastScanAt: number | null;
   lastScanStatus: ScanStatus | null;
+  /** Set only when lastScanStatus is 'failed' — the card's tooltip (8.1). */
+  lastScanErrorMessage: string | null;
   countVulnCritical: number;
   countVulnHigh: number;
   countVulnMedium: number;

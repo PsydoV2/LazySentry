@@ -1,11 +1,14 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError, type CurrentUser, type SetupStatus } from './lib/api';
+import { useRoute } from './lib/router';
 import { Dashboard } from './views/Dashboard';
 import { Login } from './views/Login';
+import { ProjectDetail } from './views/ProjectDetail';
 import { SetupWizard } from './views/SetupWizard';
 
 export function App() {
   const queryClient = useQueryClient();
+  const [route, navigate] = useRoute();
 
   const setup = useQuery({
     queryKey: ['setup-status'],
@@ -62,5 +65,20 @@ export function App() {
     return <SetupWizard status={setup.data} onComplete={invalidateAll} />;
   }
 
-  return <Dashboard user={session.data} onSignedOut={invalidateAll} />;
+  if (route.name === 'project') {
+    return (
+      // Keyed on the id so navigating from one project straight to another
+      // remounts the view — otherwise the active tab (and each tab's own
+      // filter state) would carry over from the previous project.
+      <ProjectDetail
+        key={route.id}
+        projectId={route.id}
+        onBack={() => navigate({ name: 'dashboard' })}
+      />
+    );
+  }
+
+  return (
+    <Dashboard user={session.data} onSignedOut={invalidateAll} navigate={navigate} />
+  );
 }
