@@ -67,6 +67,9 @@ export async function cloneRepository(
     ['clone', '--quiet', '--', cloneUrl, targetDir],
     { timeoutMs: CLONE_TIMEOUT_MS, env: cloneEnv(token) },
   );
+  if (clone.spawnError) {
+    throw new CloneError(`could not start git (${clone.spawnError})`);
+  }
   if (clone.timedOut) {
     throw new CloneError('git clone timed out');
   }

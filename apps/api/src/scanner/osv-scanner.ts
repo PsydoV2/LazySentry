@@ -49,6 +49,14 @@ export async function runOsvScanner(scanDir: string): Promise<OsvScanOutcome> {
     { timeoutMs: OSV_TIMEOUT_MS },
   );
 
+  if (result.spawnError) {
+    // Naming the configured path turns "scan failed" into something the
+    // operator can actually act on.
+    return {
+      kind: 'failed',
+      message: `could not start osv-scanner (${result.spawnError}); OSV_SCANNER_PATH=${config.OSV_SCANNER_PATH}`,
+    };
+  }
   if (result.timedOut) {
     return { kind: 'failed', message: 'osv-scanner timed out' };
   }

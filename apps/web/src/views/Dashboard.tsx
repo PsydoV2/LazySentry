@@ -140,11 +140,6 @@ export function Dashboard({
 function ProjectCounts({ project }: { project: Project }) {
   // Color is urgency, not severity (docs/CONCEPT.md 8.1): an active
   // credential outranks everything else.
-  if (project.scanState !== 'idle') {
-    // Nothing was measured yet in this run — showing the previous result as
-    // if it were current is exactly the false status 11 rules out.
-    return <span className="subtle">scan in progress</span>;
-  }
   if (project.lastScanStatus === null) {
     return <span className="subtle">not scanned yet</span>;
   }

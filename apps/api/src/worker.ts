@@ -1,6 +1,7 @@
 // Entrypoint for the worker process: polls the jobs table and runs scans
 // sequentially, concurrency 1 (docs/CONCEPT.md 0.1/0.2, section 5).
 
+import { config } from './config.js';
 import { closeDb, runMigrations } from './db/client.js';
 import {
   claimNextJob,
@@ -12,6 +13,7 @@ import {
 import { recoverOrphanedScans } from './scan/recovery.js';
 import { runScan } from './scan/run-scan.js';
 import { cleanupOrphanedScanDirs } from './scanner/clone.js';
+import { execute } from './scanner/exec.js';
 
 const POLL_INTERVAL_MS = 1000;
 const workerId = `worker-${process.pid}`;
@@ -20,6 +22,28 @@ let shuttingDown = false;
 
 function log(message: string): void {
   console.log(`[${new Date().toISOString()}] ${workerId}: ${message}`);
+}
+
+/**
+ * Warns at startup about a scanner that cannot be executed. Without this the
+ * first symptom is a scan that reports a failure for reasons nobody sees
+ * until they open the scan record — and in a fresh local checkout a missing
+ * binary is the single most likely thing to be wrong.
+ */
+async function checkScannerBinaries(): Promise<void> {
+  const binaries = [
+    ['osv-scanner', config.OSV_SCANNER_PATH, 'OSV_SCANNER_PATH'],
+    ['trufflehog', config.TRUFFLEHOG_PATH, 'TRUFFLEHOG_PATH'],
+  ] as const;
+  for (const [name, binaryPath, envVar] of binaries) {
+    const result = await execute(binaryPath, ['--version'], { timeoutMs: 15_000 });
+    if (result.spawnError) {
+      log(
+        `WARNING: ${name} cannot be executed at "${binaryPath}" (${result.spawnError}). ` +
+          `Scans will record this scanner as failed — set ${envVar} to a working binary.`,
+      );
+    }
+  }
 }
 
 async function processJob(job: Job): Promise<void> {
@@ -46,6 +70,8 @@ function sleep(ms: number): Promise<void> {
 
 async function main(): Promise<void> {
   runMigrations();
+
+  await checkScannerBinaries();
 
   const orphanDirs = await cleanupOrphanedScanDirs();
   if (orphanDirs.length > 0) {

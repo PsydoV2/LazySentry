@@ -65,6 +65,12 @@ export async function runTruffleHog(
     timeoutMs: TRUFFLEHOG_TIMEOUT_MS,
   });
 
+  if (result.spawnError) {
+    return {
+      kind: 'failed',
+      message: `could not start trufflehog (${result.spawnError}); TRUFFLEHOG_PATH=${config.TRUFFLEHOG_PATH}`,
+    };
+  }
   if (result.timedOut) {
     return { kind: 'failed', message: 'trufflehog timed out' };
   }

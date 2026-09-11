@@ -64,8 +64,20 @@ Requires Node.js ≥ 22 and [pnpm](https://pnpm.io).
 ```sh
 pnpm install
 cp .env.example .env        # then fill in APP_ENCRYPTION_KEY (see comments in the file)
-pnpm dev                    # starts API (127.0.0.1:3000) and web dev server in parallel
+pnpm dev                    # starts the API (127.0.0.1:3000), the scan worker and the web dev server
 ```
+
+Scans are executed by the **worker** process, not by the API — a queued scan
+stays queued until a worker is running. `pnpm dev` starts one; on its own it
+is `pnpm --filter @lazysentry/api dev:worker`.
+
+For local development the worker needs both scanner binaries. Download a
+pinned release of [osv-scanner](https://github.com/google/osv-scanner/releases)
+and [TruffleHog](https://github.com/trufflesecurity/trufflehog/releases) and
+point `OSV_SCANNER_PATH` / `TRUFFLEHOG_PATH` in `.env` at them (the Docker
+image bakes both in). The worker warns at startup about a binary it cannot
+execute; scans then record that scanner as failed instead of pretending the
+repository is clean.
 
 Other commands: `pnpm build` (all packages), `pnpm test`, `pnpm typecheck`.
 

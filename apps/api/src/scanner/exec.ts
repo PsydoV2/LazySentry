@@ -9,6 +9,13 @@ export interface ExecResult {
   stdout: string;
   stderr: string;
   timedOut: boolean;
+  /**
+   * Set when the process could not be started at all — a missing binary, a
+   * wrong path in the configuration, a missing execute bit. Reported instead
+   * of thrown so a caller can treat it as *that scanner* failing rather than
+   * as the whole scan blowing up (docs/CONCEPT.md 5.7).
+   */
+  spawnError?: string;
 }
 
 export interface ExecOptions {
@@ -24,7 +31,7 @@ export function execute(
   args: string[],
   options: ExecOptions,
 ): Promise<ExecResult> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const child = spawn(command, args, {
       cwd: options.cwd,
       env: options.env,
@@ -55,7 +62,13 @@ export function execute(
 
     child.on('error', (error) => {
       clearTimeout(timer);
-      reject(error);
+      resolve({
+        exitCode: null,
+        stdout: '',
+        stderr: '',
+        timedOut: false,
+        spawnError: error.message,
+      });
     });
 
     child.on('close', (exitCode) => {
