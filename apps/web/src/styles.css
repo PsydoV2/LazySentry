@@ -358,13 +358,15 @@ button:disabled {
 
 .project-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 212px));
+  grid-template-columns: repeat(auto-fill, minmax(240px, 270px));
   justify-content: start;
   gap: var(--space-4);
 }
 
 .project-card {
-  aspect-ratio: 9 / 16;
+  /* Portrait, but not phone-narrow — wide enough for the pills to sit
+     comfortably next to each other instead of stacking one per line. */
+  aspect-ratio: 3 / 4;
   text-align: left;
   display: flex;
   flex-direction: column;
@@ -540,7 +542,11 @@ button:disabled {
   background: color-mix(in srgb, var(--signal-ok) 16%, transparent);
 }
 
-.scan-btn:hover:not(:disabled) {
+/* :not(.scan-btn-busy) here, not just extra specificity on the busy rule
+   below — otherwise this idle-state green hover (higher specificity from
+   the extra :not(:disabled)) always wins over .scan-btn-busy:hover and the
+   background never actually turns red. */
+.scan-btn:hover:not(:disabled):not(.scan-btn-busy) {
   background: color-mix(in srgb, var(--signal-ok) 28%, transparent);
 }
 
