@@ -135,78 +135,86 @@ export function registerGithubRoutes(app: FastifyInstance): void {
     };
   });
 
-  app.post('/api/projects/import', async (request, reply) => {
-    requireAuth(request);
-    requireSameOrigin(request);
-    const account = getGitAccount();
-    if (!account) throw notFound('No GitHub account connected');
+  app.post(
+    '/api/projects/import',
+    {
+      // Importing enqueues one scan per repository, so this endpoint can
+      // flood the worker just like the manual trigger (docs/CONCEPT.md 6.2).
+      config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+    },
+    async (request, reply) => {
+      requireAuth(request);
+      requireSameOrigin(request);
+      const account = getGitAccount();
+      if (!account) throw notFound('No GitHub account connected');
 
-    const { repositoryIds } = importSchema.parse(request.body);
-    const token = getAccountToken(account);
+      const { repositoryIds } = importSchema.parse(request.body);
+      const token = getAccountToken(account);
 
-    // Resolve the selected ids against the account's repositories, so a
-    // client cannot import a repository this token has no access to.
-    const wanted = new Set(repositoryIds);
-    const found = new Map<string, Awaited<ReturnType<typeof githubProvider.listRepositories>>['repositories'][number]>();
-    try {
-      for (let page = 1; page <= 20 && found.size < wanted.size; page++) {
-        const result = await githubProvider.listRepositories(token, {
-          page,
-          perPage: 100,
-        });
-        for (const repo of result.repositories) {
-          if (wanted.has(repo.providerRepoId)) found.set(repo.providerRepoId, repo);
+      // Resolve the selected ids against the account's repositories, so a
+      // client cannot import a repository this token has no access to.
+      const wanted = new Set(repositoryIds);
+      const found = new Map<string, Awaited<ReturnType<typeof githubProvider.listRepositories>>['repositories'][number]>();
+      try {
+        for (let page = 1; page <= 20 && found.size < wanted.size; page++) {
+          const result = await githubProvider.listRepositories(token, {
+            page,
+            perPage: 100,
+          });
+          for (const repo of result.repositories) {
+            if (wanted.has(repo.providerRepoId)) found.set(repo.providerRepoId, repo);
+          }
+          if (!result.hasMore) break;
         }
-        if (!result.hasMore) break;
+        markAccountValid(account.id);
+      } catch (error) {
+        if (error instanceof ProviderAuthError) markAccountInvalid(account.id);
+        return toApiError(error);
       }
-      markAccountValid(account.id);
-    } catch (error) {
-      if (error instanceof ProviderAuthError) markAccountInvalid(account.id);
-      return toApiError(error);
-    }
 
-    const missing = repositoryIds.filter((id) => !found.has(id));
-    if (missing.length > 0) {
-      throw badRequest(
-        `Not accessible with the connected account: ${missing.join(', ')}`,
+      const missing = repositoryIds.filter((id) => !found.has(id));
+      if (missing.length > 0) {
+        throw badRequest(
+          `Not accessible with the connected account: ${missing.join(', ')}`,
+        );
+      }
+
+      const alreadyImported = new Set(
+        db
+          .select({ providerRepoId: projects.providerRepoId })
+          .from(projects)
+          .where(inArray(projects.providerRepoId, [...wanted]))
+          .all()
+          .map((row) => row.providerRepoId),
       );
-    }
 
-    const alreadyImported = new Set(
-      db
-        .select({ providerRepoId: projects.providerRepoId })
-        .from(projects)
-        .where(inArray(projects.providerRepoId, [...wanted]))
-        .all()
-        .map((row) => row.providerRepoId),
-    );
-
-    const imported: { id: number; fullName: string }[] = [];
-    const skipped: string[] = [];
-    for (const [repoId, repo] of found) {
-      if (alreadyImported.has(repoId)) {
-        skipped.push(repo.fullName);
-        continue;
+      const imported: { id: number; fullName: string }[] = [];
+      const skipped: string[] = [];
+      for (const [repoId, repo] of found) {
+        if (alreadyImported.has(repoId)) {
+          skipped.push(repo.fullName);
+          continue;
+        }
+        const project = db
+          .insert(projects)
+          .values({
+            gitAccountId: account.id,
+            providerRepoId: repo.providerRepoId,
+            name: repo.name,
+            fullName: repo.fullName,
+            defaultBranch: repo.defaultBranch,
+            cloneUrl: repo.cloneUrl,
+            isPrivate: repo.isPrivate,
+            addedAt: new Date(),
+          })
+          .returning({ id: projects.id, fullName: projects.fullName })
+          .get();
+        // The card should appear as "scanning" right away (docs/CONCEPT.md 8.1).
+        enqueueScanJob({ projectId: project.id, trigger: 'manual' });
+        imported.push(project);
       }
-      const project = db
-        .insert(projects)
-        .values({
-          gitAccountId: account.id,
-          providerRepoId: repo.providerRepoId,
-          name: repo.name,
-          fullName: repo.fullName,
-          defaultBranch: repo.defaultBranch,
-          cloneUrl: repo.cloneUrl,
-          isPrivate: repo.isPrivate,
-          addedAt: new Date(),
-        })
-        .returning({ id: projects.id, fullName: projects.fullName })
-        .get();
-      // The card should appear as "scanning" right away (docs/CONCEPT.md 8.1).
-      enqueueScanJob({ projectId: project.id, trigger: 'manual' });
-      imported.push(project);
-    }
 
-    return reply.status(201).send({ imported, skipped });
-  });
+      return reply.status(201).send({ imported, skipped });
+    },
+  );
 }

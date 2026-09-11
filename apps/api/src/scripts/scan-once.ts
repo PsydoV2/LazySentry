@@ -30,5 +30,8 @@ if (!project) {
 }
 
 console.log(`Scanning ${project.fullName} (project ${project.id}) ...`);
-const { scanId, status } = await runScan(project.id, 'manual');
+const { scanId, status } = await runScan({
+  projectId: project.id,
+  trigger: 'manual',
+});
 console.log(`Scan ${scanId} finished with status: ${status}`);

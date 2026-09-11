@@ -46,78 +46,36 @@ export const api = {
       method: 'POST',
       body: body === undefined ? undefined : JSON.stringify(body),
     }),
+  patch: <T>(path: string, body: unknown) =>
+    request<T>(path, { method: 'PATCH', body: JSON.stringify(body) }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
 };
 
 // ---- response types ----
+//
+// Defined once in packages/shared and re-exported here, so the frontend and
+// the API can never drift apart on a response shape (docs/CONCEPT.md 0, 3.4).
 
-export interface SetupStatus {
-  adminAccountExists: boolean;
-  gitAccountConnected: boolean;
-  complete: boolean;
-}
-
-export interface CurrentUser {
-  id: number;
-  username: string;
-}
-
-export interface GitAccount {
-  id: number;
-  provider: string;
-  username: string;
-  scopes: string[];
-  status: string;
-  connectedAt: number;
-  lastValidatedAt: number | null;
-}
-
-export interface ConnectResult {
-  account: GitAccount;
-  writeScopes: string[];
-  scopesUnknown: boolean;
-}
-
-export interface Repository {
-  providerRepoId: string;
-  name: string;
-  fullName: string;
-  defaultBranch: string;
-  isPrivate: boolean;
-  language: string | null;
-  updatedAt: string | null;
-  imported: boolean;
-}
-
-export interface RepositoryPage {
-  repositories: Repository[];
-  page: number;
-  hasMore: boolean;
-}
-
-export interface Project {
-  id: number;
-  fullName: string;
-  name: string;
-  isPrivate: boolean;
-  lastScanId: number | null;
-  lastScanAt: number | null;
-  lastScanStatus: string | null;
-  countVulnCritical: number;
-  countVulnHigh: number;
-  countVulnMedium: number;
-  countVulnLow: number;
-  countSecretsVerified: number;
-  countSecretsUnknown: number;
-}
-
-export interface Vulnerability {
-  id: number;
-  osvId: string;
-  aliases: string[] | null;
-  severity: string;
-  cvssScore: number | null;
-  summary: string | null;
-  fixedVersion: string | null;
-  status: string;
-}
+export type {
+  ConnectResult,
+  CurrentUser,
+  FindingStatus,
+  GitAccount,
+  ImportResult,
+  PackageEntry,
+  Project,
+  ProjectSettingsUpdate,
+  Repository,
+  RepositoryPage,
+  Scan,
+  ScanEvent,
+  ScanQueued,
+  ScanState,
+  ScanStatus,
+  ScannerStatus,
+  Secret,
+  SetupStatus,
+  Severity,
+  UpdateType,
+  Vulnerability,
+} from '@lazysentry/shared';

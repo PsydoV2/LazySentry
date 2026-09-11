@@ -8,9 +8,9 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "pnpm --parallel --filter \"./apps/*\" dev",
+    "dev": "pnpm --filter @lazysentry/shared build && pnpm --parallel --filter \"./apps/*\" dev",
     "build": "pnpm -r build",
-    "test": "pnpm -r test",
-    "typecheck": "pnpm -r typecheck"
+    "test": "pnpm --filter @lazysentry/shared build && pnpm -r test",
+    "typecheck": "pnpm --filter @lazysentry/shared build && pnpm -r typecheck"
   }
 }

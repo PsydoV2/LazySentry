@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ImportDialog } from '../components/ImportDialog';
 import { api, type CurrentUser, type Project } from '../lib/api';
+import { useScanEvents } from '../lib/events';
 
 function relativeTime(timestamp: number | null): string {
   if (timestamp === null) return 'never scanned';
@@ -28,6 +29,9 @@ export function Dashboard({
 }) {
   const queryClient = useQueryClient();
   const [importing, setImporting] = useState(false);
+
+  // Scan progress arrives over SSE instead of being polled (3.5).
+  useScanEvents();
 
   const projects = useQuery({
     queryKey: ['projects'],
@@ -106,12 +110,18 @@ export function Dashboard({
                 </div>
                 <ProjectCounts project={project} />
                 <span className="subtle">
-                  {relativeTime(project.lastScanAt)}
+                  {project.scanState === 'idle'
+                    ? relativeTime(project.lastScanAt)
+                    : project.scanState === 'queued'
+                      ? 'queued'
+                      : 'scanning…'}
                 </span>
                 <button
                   type="button"
                   className="btn-secondary"
-                  disabled={triggerScan.isPending}
+                  disabled={
+                    triggerScan.isPending || project.scanState !== 'idle'
+                  }
                   onClick={() => triggerScan.mutate(project.id)}
                 >
                   Scan now
@@ -130,6 +140,11 @@ export function Dashboard({
 function ProjectCounts({ project }: { project: Project }) {
   // Color is urgency, not severity (docs/CONCEPT.md 8.1): an active
   // credential outranks everything else.
+  if (project.scanState !== 'idle') {
+    // Nothing was measured yet in this run — showing the previous result as
+    // if it were current is exactly the false status 11 rules out.
+    return <span className="subtle">scan in progress</span>;
+  }
   if (project.lastScanStatus === null) {
     return <span className="subtle">not scanned yet</span>;
   }

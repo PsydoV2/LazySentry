@@ -61,6 +61,12 @@ export const jobs = sqliteTable(
 export interface ScanJobPayload {
   projectId: number;
   trigger: 'manual' | 'scheduled';
+  /**
+   * Full rescan: ignore last_scanned_commit_sha and walk the entire history
+   * again instead of only new commits (docs/CONCEPT.md 5.4). Absent on the
+   * normal incremental path.
+   */
+  fullRescan?: boolean;
 }
 
 export const projects = sqliteTable(

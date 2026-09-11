@@ -11,8 +11,10 @@ import Fastify from 'fastify';
 import { registerSessions } from './auth/session.js';
 import { config } from './config.js';
 import { runMigrations } from './db/client.js';
+import { ScanEventStream } from './events/scan-events.js';
 import { AppError, NOT_FOUND_BODY, registerErrorHandler } from './lib/errors.js';
 import { registerAuthRoutes } from './routes/auth.js';
+import { registerEventRoutes } from './routes/events.js';
 import { registerGithubRoutes } from './routes/github.js';
 import { registerProjectRoutes } from './routes/projects.js';
 import { registerSetupRoutes } from './routes/setup.js';
@@ -78,6 +80,14 @@ registerSetupRoutes(app);
 registerAuthRoutes(app);
 registerGithubRoutes(app);
 registerProjectRoutes(app);
+
+// Scan progress reaches the browser over SSE; the worker's status changes are
+// picked up by polling this process's own database (docs/CONCEPT.md 3.5).
+const scanEvents = new ScanEventStream({
+  onError: (error) => app.log.error(error, 'scan event poll failed'),
+});
+registerEventRoutes(app, scanEvents);
+scanEvents.start();
 
 // Serve the React build when it exists (production image). In development
 // the Vite dev server handles the frontend and proxies /api here.

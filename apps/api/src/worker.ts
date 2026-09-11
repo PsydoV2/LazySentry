@@ -28,7 +28,7 @@ async function processJob(job: Job): Promise<void> {
     if (job.type !== 'scan') {
       throw new Error(`unknown job type: ${job.type}`);
     }
-    const { scanId, status } = await runScan(job.payload.projectId, job.payload.trigger);
+    const { scanId, status } = await runScan(job.payload);
     // A scan that ran and recorded a failure is a processed job — the result
     // lives on the scan record. Only infrastructure errors (throws) retry.
     completeJob(job.id);

@@ -9,6 +9,7 @@ import {
   scans,
   secrets,
   vulnerabilities,
+  type ScanJobPayload,
 } from '../db/schema.js';
 import { secretFingerprint, vulnerabilityFingerprint } from '../lib/fingerprint.js';
 import { redactSecret } from '../lib/redact.js';
@@ -39,9 +40,9 @@ import {
 } from './version-audit.js';
 
 export async function runScan(
-  projectId: number,
-  trigger: 'manual' | 'scheduled',
+  payload: ScanJobPayload,
 ): Promise<{ scanId: number; status: string }> {
+  const { projectId, trigger } = payload;
   const project = db
     .select()
     .from(projects)
@@ -94,9 +95,11 @@ export async function runScan(
 
     if (project.scanSecretsEnabled) {
       // The commit this project was scanned up to *before* this run — unset
-      // on the very first scan, which means "scan full history"
-      // (docs/CONCEPT.md 5.4).
-      const sinceCommit = project.lastScannedCommitSha ?? undefined;
+      // on the very first scan and on an explicitly requested full rescan,
+      // which both mean "scan the full history" (docs/CONCEPT.md 5.4).
+      const sinceCommit = payload.fullRescan
+        ? undefined
+        : (project.lastScannedCommitSha ?? undefined);
       const trufflehog = await runTruffleHog(scanDir, {
         sinceCommit,
         verify: project.verifySecretsEnabled,
