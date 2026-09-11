@@ -33,7 +33,8 @@ export type ScanStatus =
   | 'running'
   | 'completed'
   | 'completed_with_warnings'
-  | 'failed';
+  | 'failed'
+  | 'cancelled';
 
 /**
  * Per-scanner outcome, so "nothing was checked" never looks like "nothing
@@ -86,6 +87,11 @@ export interface GitAccount {
   status: string;
   connectedAt: number;
   lastValidatedAt: number | null;
+}
+
+/** GET /api/git-accounts — null when nothing is connected yet. */
+export interface GitAccountStatus {
+  account: GitAccount | null;
 }
 
 export interface ConnectResult {
@@ -239,6 +245,7 @@ export const SCAN_EVENT_TYPES = [
   'scan.started',
   'scan.completed',
   'scan.failed',
+  'scan.cancelled',
 ] as const;
 
 export type ScanEventType = (typeof SCAN_EVENT_TYPES)[number];

@@ -115,6 +115,52 @@ describe('scan event poller', () => {
     ]);
   });
 
+  it('reports a scan cancelled while running as scan.cancelled', () => {
+    const projectId = createProject('zeta');
+    const poller = createScanEventPoller();
+    const scanId = startScan(projectId);
+    const job = db
+      .insert(jobs)
+      .values({
+        type: 'scan',
+        payload: { projectId, trigger: 'manual' },
+        status: 'running',
+        createdAt: new Date(),
+      })
+      .returning({ id: jobs.id })
+      .get();
+    poller.poll();
+
+    finishScan(scanId, 'cancelled');
+    db.update(jobs).set({ status: 'cancelled' }).where(eq(jobs.id, job.id)).run();
+    // The scan row's own transition is the one event — the job side must not
+    // duplicate it just because it also reached a terminal state this tick.
+    expect(poller.poll()).toEqual([
+      { type: 'scan.cancelled', projectId, scanId, status: 'cancelled' },
+    ]);
+  });
+
+  it('reports a job cancelled while still pending, which never created a scan record', () => {
+    const projectId = createProject('eta');
+    const poller = createScanEventPoller();
+
+    const job = db
+      .insert(jobs)
+      .values({
+        type: 'scan',
+        payload: { projectId, trigger: 'manual' },
+        createdAt: new Date(),
+      })
+      .returning({ id: jobs.id })
+      .get();
+    expect(poller.poll()).toEqual([]);
+
+    db.update(jobs).set({ status: 'cancelled' }).where(eq(jobs.id, job.id)).run();
+    expect(poller.poll()).toEqual([
+      { type: 'scan.cancelled', projectId, scanId: null, status: 'cancelled' },
+    ]);
+  });
+
   it('reports a job that failed before producing a scan record', () => {
     const projectId = createProject('delta');
     const poller = createScanEventPoller();

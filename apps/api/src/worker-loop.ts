@@ -11,6 +11,8 @@ import {
   claimNextJob,
   completeJob,
   failJob,
+  isCancelRequested,
+  markJobCancelled,
   recoverOrphanedJobs,
   type Job,
 } from './queue/jobs.js';
@@ -52,19 +54,35 @@ async function checkScannerBinaries(): Promise<void> {
 
 async function processJob(job: Job): Promise<void> {
   log(`processing job ${job.id} (${job.type}, attempt ${job.attempts}/${job.maxAttempts})`);
+
+  // api and worker are separate processes sharing only the database
+  // (docs/CONCEPT.md 0.1), so a cancel request arrives as a row, not a
+  // signal — this poll is what turns it into the AbortSignal runScan
+  // actually reacts to while a subprocess is in flight.
+  const abortController = new AbortController();
+  const cancelPoll = setInterval(() => {
+    if (isCancelRequested(job.id)) abortController.abort();
+  }, POLL_INTERVAL_MS);
+
   try {
     if (job.type !== 'scan') {
       throw new Error(`unknown job type: ${job.type}`);
     }
-    const { scanId, status } = await runScan(job.payload);
+    const { scanId, status } = await runScan(job.payload, abortController.signal);
     // A scan that ran and recorded a failure is a processed job — the result
     // lives on the scan record. Only infrastructure errors (throws) retry.
-    completeJob(job.id);
+    if (status === 'cancelled') {
+      markJobCancelled(job.id);
+    } else {
+      completeJob(job.id);
+    }
     log(`job ${job.id} done (scan ${scanId}: ${status})`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     failJob(job.id, message);
     log(`job ${job.id} attempt failed: ${message}`);
+  } finally {
+    clearInterval(cancelPoll);
   }
 }
 

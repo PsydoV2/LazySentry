@@ -88,6 +88,13 @@ export function registerGithubRoutes(app: FastifyInstance): void {
     },
   );
 
+  /** Connected account status for the Settings page (docs/CONCEPT.md 6.2). */
+  app.get('/api/git-accounts', async (request) => {
+    requireAuth(request);
+    const account = getGitAccount();
+    return { account: account ? toPublicAccount(account) : null };
+  });
+
   app.get('/api/git-accounts/github/repositories', async (request) => {
     requireAuth(request);
     const account = getGitAccount();

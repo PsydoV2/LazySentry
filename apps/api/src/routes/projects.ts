@@ -11,7 +11,7 @@ import {
   vulnerabilities,
 } from '../db/schema.js';
 import { conflict, notFound } from '../lib/errors.js';
-import { enqueueScanJob, hasActiveScanJob } from '../queue/jobs.js';
+import { cancelScanJob, enqueueScanJob, hasActiveScanJob } from '../queue/jobs.js';
 import { scanStateFor, scanStatesByProject } from '../scan/scan-state.js';
 import {
   toPackageDto,
@@ -142,6 +142,21 @@ export function registerProjectRoutes(app: FastifyInstance): void {
         ...(input.full ? { fullRescan: true } : {}),
       });
       return reply.status(202).send({ jobId: job.id, status: job.status });
+    },
+  );
+
+  app.post(
+    '/api/projects/:id/scans/cancel',
+    { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      requireAuth(request);
+      requireSameOrigin(request);
+      const project = requireProject(request.params);
+      const result = cancelScanJob(project.id);
+      if (result === 'not_found') {
+        throw notFound('No active scan to cancel');
+      }
+      return reply.status(result === 'cancelled' ? 200 : 202).send({ status: result });
     },
   );
 

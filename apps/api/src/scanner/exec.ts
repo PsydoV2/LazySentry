@@ -9,6 +9,8 @@ export interface ExecResult {
   stdout: string;
   stderr: string;
   timedOut: boolean;
+  /** True when `options.signal` fired before the process exited on its own. */
+  cancelled: boolean;
   /**
    * Set when the process could not be started at all — a missing binary, a
    * wrong path in the configuration, a missing execute bit. Reported instead
@@ -24,6 +26,8 @@ export interface ExecOptions {
   env?: NodeJS.ProcessEnv;
   /** Cap on captured stderr, to keep a noisy process out of the heap. */
   maxStderrBytes?: number;
+  /** Kills the child immediately when this fires (a user-requested cancel). */
+  signal?: AbortSignal;
 }
 
 export function execute(
@@ -32,6 +36,12 @@ export function execute(
   options: ExecOptions,
 ): Promise<ExecResult> {
   return new Promise((resolve) => {
+    // Already cancelled before we ever spawned anything — nothing to kill.
+    if (options.signal?.aborted) {
+      resolve({ exitCode: null, stdout: '', stderr: '', timedOut: false, cancelled: true });
+      return;
+    }
+
     const child = spawn(command, args, {
       cwd: options.cwd,
       env: options.env,
@@ -43,11 +53,18 @@ export function execute(
     let stdout = '';
     let stderr = '';
     let timedOut = false;
+    let cancelled = false;
 
     const timer = setTimeout(() => {
       timedOut = true;
       child.kill('SIGKILL');
     }, options.timeoutMs);
+
+    const onAbort = () => {
+      cancelled = true;
+      child.kill('SIGKILL');
+    };
+    options.signal?.addEventListener('abort', onAbort, { once: true });
 
     const maxStderr = options.maxStderrBytes ?? 64 * 1024;
 
@@ -62,18 +79,21 @@ export function execute(
 
     child.on('error', (error) => {
       clearTimeout(timer);
+      options.signal?.removeEventListener('abort', onAbort);
       resolve({
         exitCode: null,
         stdout: '',
         stderr: '',
         timedOut: false,
+        cancelled,
         spawnError: error.message,
       });
     });
 
     child.on('close', (exitCode) => {
       clearTimeout(timer);
-      resolve({ exitCode, stdout, stderr, timedOut });
+      options.signal?.removeEventListener('abort', onAbort);
+      resolve({ exitCode, stdout, stderr, timedOut, cancelled });
     });
   });
 }

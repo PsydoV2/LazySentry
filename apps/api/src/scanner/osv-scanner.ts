@@ -40,15 +40,22 @@ export interface OsvVulnerability {
 export type OsvScanOutcome =
   | { kind: 'completed'; output: OsvScannerOutput }
   | { kind: 'completed_empty' }
-  | { kind: 'failed'; message: string };
+  | { kind: 'failed'; message: string }
+  | { kind: 'cancelled' };
 
-export async function runOsvScanner(scanDir: string): Promise<OsvScanOutcome> {
+export async function runOsvScanner(
+  scanDir: string,
+  signal?: AbortSignal,
+): Promise<OsvScanOutcome> {
   const result = await execute(
     config.OSV_SCANNER_PATH,
     ['scan', 'source', '-r', scanDir, '--format', 'json', '--all-packages'],
-    { timeoutMs: OSV_TIMEOUT_MS },
+    { timeoutMs: OSV_TIMEOUT_MS, signal },
   );
 
+  if (result.cancelled) {
+    return { kind: 'cancelled' };
+  }
   if (result.spawnError) {
     // Naming the configured path turns "scan failed" into something the
     // operator can actually act on.

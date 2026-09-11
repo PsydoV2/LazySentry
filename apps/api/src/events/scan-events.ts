@@ -13,6 +13,7 @@ const TERMINAL_SCAN_STATUSES = new Set([
   'completed',
   'completed_with_warnings',
   'failed',
+  'cancelled',
 ]);
 
 export interface ScanEventPoller {
@@ -76,7 +77,12 @@ export function createScanEventPoller(): ScanEventPoller {
       if (TERMINAL_SCAN_STATUSES.has(row.status)) {
         if (known !== row.status) {
           events.push({
-            type: row.status === 'failed' ? 'scan.failed' : 'scan.completed',
+            type:
+              row.status === 'failed'
+                ? 'scan.failed'
+                : row.status === 'cancelled'
+                  ? 'scan.cancelled'
+                  : 'scan.completed',
             projectId: row.projectId,
             scanId: row.id,
             status: row.status as ScanStatus,
@@ -116,16 +122,31 @@ export function createScanEventPoller(): ScanEventPoller {
 
     for (const row of rows) {
       const projectId = row.payload?.projectId;
+      const known = watchedJobs.get(row.id);
       if (row.status === 'pending' || row.status === 'running') {
         watchedJobs.set(row.id, row.status);
       } else {
-        if (row.status === 'failed' && typeof projectId === 'number') {
-          events.push({
-            type: 'scan.failed',
-            projectId,
-            scanId: null,
-            status: 'failed',
-          });
+        if (typeof projectId === 'number') {
+          if (row.status === 'failed') {
+            events.push({
+              type: 'scan.failed',
+              projectId,
+              scanId: null,
+              status: 'failed',
+            });
+          } else if (row.status === 'cancelled' && known !== 'running') {
+            // A job cancelled while still pending never created a scan row,
+            // so pollScans above has nothing to report — this is the only
+            // event for it. One cancelled while running did create one, and
+            // that row's own terminal transition already fired above; firing
+            // again here from the job side would just duplicate it.
+            events.push({
+              type: 'scan.cancelled',
+              projectId,
+              scanId: null,
+              status: 'cancelled',
+            });
+          }
         }
         watchedJobs.delete(row.id);
       }

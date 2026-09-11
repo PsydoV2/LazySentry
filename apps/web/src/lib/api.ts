@@ -61,6 +61,7 @@ export type {
   CurrentUser,
   FindingStatus,
   GitAccount,
+  GitAccountStatus,
   ImportResult,
   PackageEntry,
   Project,

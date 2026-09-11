@@ -16,6 +16,8 @@ export class CloneError extends Error {
     message: string,
     /** True when the remote rejected our credentials (401/403). */
     readonly isAuthFailure = false,
+    /** True when this is a user-requested cancellation, not a real failure. */
+    readonly isCancelled = false,
   ) {
     super(message);
   }
@@ -61,12 +63,16 @@ export async function cloneRepository(
   cloneUrl: string,
   targetDir: string,
   token?: string,
+  signal?: AbortSignal,
 ): Promise<{ commitSha: string }> {
   const clone = await execute(
     'git',
     ['clone', '--quiet', '--', cloneUrl, targetDir],
-    { timeoutMs: CLONE_TIMEOUT_MS, env: cloneEnv(token) },
+    { timeoutMs: CLONE_TIMEOUT_MS, env: cloneEnv(token), signal },
   );
+  if (clone.cancelled) {
+    throw new CloneError('git clone cancelled', false, true);
+  }
   if (clone.spawnError) {
     throw new CloneError(`could not start git (${clone.spawnError})`);
   }
@@ -83,7 +89,11 @@ export async function cloneRepository(
 
   const revParse = await execute('git', ['-C', targetDir, 'rev-parse', 'HEAD'], {
     timeoutMs: 30_000,
+    signal,
   });
+  if (revParse.cancelled) {
+    throw new CloneError('git clone cancelled', false, true);
+  }
   if (revParse.exitCode !== 0) {
     throw new CloneError('could not determine HEAD commit of cloned repository');
   }

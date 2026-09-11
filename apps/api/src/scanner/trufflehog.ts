@@ -58,7 +58,8 @@ export interface TruffleHogFinding {
 
 export type TruffleHogOutcome =
   | { kind: 'completed'; findings: TruffleHogFinding[] }
-  | { kind: 'failed'; message: string };
+  | { kind: 'failed'; message: string }
+  | { kind: 'cancelled' };
 
 export interface TruffleHogOptions {
   /** Only scan commits after this one (docs/CONCEPT.md 5.4). Omit for a full-history scan. */
@@ -70,6 +71,7 @@ export interface TruffleHogOptions {
 export async function runTruffleHog(
   scanDir: string,
   options: TruffleHogOptions,
+  signal?: AbortSignal,
 ): Promise<TruffleHogOutcome> {
   const args = [
     'git',
@@ -92,8 +94,12 @@ export async function runTruffleHog(
 
   const result = await execute(config.TRUFFLEHOG_PATH, args, {
     timeoutMs: TRUFFLEHOG_TIMEOUT_MS,
+    signal,
   });
 
+  if (result.cancelled) {
+    return { kind: 'cancelled' };
+  }
   if (result.spawnError) {
     return {
       kind: 'failed',

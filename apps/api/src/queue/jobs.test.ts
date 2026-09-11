@@ -11,11 +11,13 @@ process.env.DATABASE_PATH = path.join(testDir, 'test.db');
 const { closeDb, db, runMigrations } = await import('../db/client.js');
 const { jobs } = await import('../db/schema.js');
 const {
+  cancelScanJob,
   claimNextJob,
   completeJob,
   enqueueScanJob,
   failJob,
   hasActiveScanJob,
+  isCancelRequested,
   recoverOrphanedJobs,
 } = await import('./jobs.js');
 const { eq } = await import('drizzle-orm');
@@ -117,5 +119,43 @@ describe('job queue', () => {
     const row = getJob(job.id);
     expect(row.status).toBe('failed');
     expect(row.errorMessage).toBe('worker crashed during execution');
+  });
+
+  it('cancels a pending job outright — it never started, nothing to kill', () => {
+    const job = enqueueScanJob({ projectId: 10, trigger: 'manual' });
+    expect(cancelScanJob(10)).toBe('cancelled');
+    const row = getJob(job.id);
+    expect(row.status).toBe('cancelled');
+    expect(row.errorMessage).toBe('Cancelled by user');
+    expect(hasActiveScanJob(10)).toBe(false);
+  });
+
+  it('only flags a running job for the worker to notice, rather than killing it directly', () => {
+    const job = enqueueScanJob({ projectId: 11, trigger: 'manual' });
+    claimNextJob('worker-a');
+
+    expect(isCancelRequested(job.id)).toBe(false);
+    expect(cancelScanJob(11)).toBe('cancelling');
+
+    const row = getJob(job.id);
+    expect(row.status).toBe('running'); // still running — the flag, not the job, changed
+    expect(row.cancelRequested).toBe(true);
+    expect(isCancelRequested(job.id)).toBe(true);
+  });
+
+  it('reports no active scan to cancel for an idle project', () => {
+    expect(cancelScanJob(999)).toBe('not_found');
+  });
+
+  it('cancels a job whose cancellation was requested before the worker crashed', () => {
+    const job = enqueueScanJob({ projectId: 12, trigger: 'manual' });
+    claimNextJob('worker-crashed');
+    cancelScanJob(12);
+
+    expect(recoverOrphanedJobs()).toBe(1);
+    const row = getJob(job.id);
+    expect(row.status).toBe('cancelled');
+    expect(row.errorMessage).toBe('Cancelled by user');
+    expect(row.lockedBy).toBeNull();
   });
 });

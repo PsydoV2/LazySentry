@@ -45,7 +45,7 @@ export const jobs = sqliteTable(
     id: integer('id').primaryKey({ autoIncrement: true }),
     type: text('type').notNull(), // 'scan'
     payload: text('payload', { mode: 'json' }).$type<ScanJobPayload>().notNull(),
-    // 'pending' | 'running' | 'done' | 'failed'
+    // 'pending' | 'running' | 'done' | 'failed' | 'cancelled'
     status: text('status').notNull().default('pending'),
     attempts: integer('attempts').notNull().default(0),
     maxAttempts: integer('max_attempts').notNull().default(3),
@@ -54,6 +54,13 @@ export const jobs = sqliteTable(
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     finishedAt: integer('finished_at', { mode: 'timestamp_ms' }),
     errorMessage: text('error_message'),
+    // Set by the API when a user asks to stop this job; the worker polls it
+    // while running and aborts the in-flight scan (docs/CONCEPT.md 0.1 — a
+    // DB flag rather than an in-process signal, since api and worker are two
+    // separate processes sharing only the database).
+    cancelRequested: integer('cancel_requested', { mode: 'boolean' })
+      .notNull()
+      .default(false),
   },
   (table) => [index('jobs_status_idx').on(table.status)],
 );
@@ -125,7 +132,7 @@ export const scans = sqliteTable(
       .notNull()
       .references(() => projects.id, { onDelete: 'cascade' }),
     // Overall status: 'queued' | 'running' | 'completed' |
-    // 'completed_with_warnings' | 'failed'
+    // 'completed_with_warnings' | 'failed' | 'cancelled'
     status: text('status').notNull(),
     // Per-scanner status so a scan can be partially successful (5.7):
     // 'pending' | 'completed' | 'completed_empty' | 'failed' | 'skipped'

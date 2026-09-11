@@ -39,8 +39,16 @@ import {
   type VersionAuditResult,
 } from './version-audit.js';
 
+/** Thrown internally to unwind the pipeline once a cancel has been requested. */
+class ScanCancelledError extends Error {}
+
+function checkCancelled(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) throw new ScanCancelledError('Scan cancelled');
+}
+
 export async function runScan(
   payload: ScanJobPayload,
+  signal?: AbortSignal,
 ): Promise<{ scanId: number; status: string }> {
   const { projectId, trigger } = payload;
   const project = db
@@ -75,14 +83,19 @@ export async function runScan(
 
   const scanDir = newScanDir();
   try {
+    checkCancelled(signal);
+
     // Private repositories need the connected account's token; the hardcoded
     // development project has no account and clones anonymously.
     const account = project.gitAccountId === null ? undefined : getGitAccount();
     const token = account ? getAccountToken(account) : undefined;
 
     try {
-      ({ commitSha } = await cloneRepository(project.cloneUrl, scanDir, token));
+      ({ commitSha } = await cloneRepository(project.cloneUrl, scanDir, token, signal));
     } catch (cloneError) {
+      if (cloneError instanceof CloneError && cloneError.isCancelled) {
+        throw new ScanCancelledError();
+      }
       // A revoked token affects every project, so flag the account instead of
       // only this scan — the UI then asks for a reconnect (CONCEPT 6.2).
       if (cloneError instanceof CloneError && cloneError.isAuthFailure && account) {
@@ -100,10 +113,12 @@ export async function runScan(
       const sinceCommit = payload.fullRescan
         ? undefined
         : (project.lastScannedCommitSha ?? undefined);
-      const trufflehog = await runTruffleHog(scanDir, {
-        sinceCommit,
-        verify: project.verifySecretsEnabled,
-      });
+      const trufflehog = await runTruffleHog(
+        scanDir,
+        { sinceCommit, verify: project.verifySecretsEnabled },
+        signal,
+      );
+      if (trufflehog.kind === 'cancelled') throw new ScanCancelledError();
       secretsStatus = trufflehog.kind;
       if (trufflehog.kind === 'completed') {
         persistSecretResults(projectId, scanId, trufflehog.findings, {
@@ -114,7 +129,9 @@ export async function runScan(
       }
     }
 
-    const osv = await runOsvScanner(scanDir);
+    checkCancelled(signal);
+    const osv = await runOsvScanner(scanDir, signal);
+    if (osv.kind === 'cancelled') throw new ScanCancelledError();
     depsStatus = osv.kind;
     switch (osv.kind) {
       case 'completed': {
@@ -148,30 +165,43 @@ export async function runScan(
       status = 'completed';
     }
   } catch (error) {
-    // Clone failed, or something unexpected escaped both scanner wrappers —
-    // there is nothing usable from this scan at all.
-    status = 'failed';
-    if (failures.length === 0) {
-      failures.push({
-        code: 'SCAN_FAILED',
-        message: error instanceof Error ? error.message : String(error),
-      });
+    if (error instanceof ScanCancelledError) {
+      // A deliberate stop, not a failure (rule 2 — semantics matter): no
+      // failure entries, and whatever scanner never got to run is 'skipped'
+      // rather than 'failed'.
+      status = 'cancelled';
+    } else {
+      // Clone failed, or something unexpected escaped both scanner wrappers —
+      // there is nothing usable from this scan at all.
+      status = 'failed';
+      if (failures.length === 0) {
+        failures.push({
+          code: 'SCAN_FAILED',
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
-    if (depsStatus === 'pending') depsStatus = 'failed';
-    if (secretsStatus === 'pending') secretsStatus = 'failed';
+    if (depsStatus === 'pending') depsStatus = status === 'cancelled' ? 'skipped' : 'failed';
+    if (secretsStatus === 'pending') secretsStatus = status === 'cancelled' ? 'skipped' : 'failed';
   } finally {
     // Always remove the temp directory, also on failure (rule 4).
     await removeScanDir(scanDir);
   }
 
   const errorCode =
-    failures.length === 0
-      ? null
-      : failures.length === 1
-        ? failures[0]!.code
-        : 'SCAN_PARTIALLY_FAILED';
+    status === 'cancelled'
+      ? 'SCAN_CANCELLED'
+      : failures.length === 0
+        ? null
+        : failures.length === 1
+          ? failures[0]!.code
+          : 'SCAN_PARTIALLY_FAILED';
   const errorMessage =
-    failures.length === 0 ? null : failures.map((f) => f.message).join(' | ');
+    status === 'cancelled'
+      ? 'Cancelled by user'
+      : failures.length === 0
+        ? null
+        : failures.map((f) => f.message).join(' | ');
 
   const finishedAt = new Date();
   db.update(scans)
