@@ -3,7 +3,7 @@ import { desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { requireAuth, requireSameOrigin } from '../auth/session.js';
 import { db } from '../db/client.js';
-import { projects, scans, vulnerabilities } from '../db/schema.js';
+import { projects, scans, secrets, vulnerabilities } from '../db/schema.js';
 import { conflict, notFound } from '../lib/errors.js';
 import { enqueueScanJob, hasActiveScanJob } from '../queue/jobs.js';
 
@@ -83,6 +83,20 @@ export function registerProjectRoutes(app: FastifyInstance): void {
       .from(vulnerabilities)
       .where(eq(vulnerabilities.projectId, projectId))
       .orderBy(desc(vulnerabilities.cvssScore))
+      .all();
+  });
+
+  app.get('/api/projects/:id/secrets', async (request) => {
+    requireAuth(request);
+    const projectId = requireProjectId(request.params);
+    // The `secrets` row itself never holds the raw value (docs/CONCEPT.md
+    // 4.3) — selecting the whole row and returning it is safe, unlike the
+    // equivalent for a hypothetical raw-secret column.
+    return db
+      .select()
+      .from(secrets)
+      .where(eq(secrets.projectId, projectId))
+      .orderBy(desc(secrets.isVerified), desc(secrets.id))
       .all();
   });
 }

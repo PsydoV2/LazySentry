@@ -191,3 +191,38 @@ export const vulnerabilities = sqliteTable(
     index('vulns_project_status_idx').on(table.projectId, table.status),
   ],
 );
+
+export const secrets = sqliteTable(
+  'secrets',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    projectId: integer('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    detectorType: text('detector_type').notNull(),
+    filePath: text('file_path').notNull(),
+    commitSha: text('commit_sha').notNull(),
+    line: integer('line'),
+    isVerified: integer('is_verified', { mode: 'boolean' })
+      .notNull()
+      .default(false),
+    // First 4 + last 4 characters of the raw secret, rest masked — never the
+    // raw value itself (docs/CONCEPT.md 4.3, rule 1).
+    redacted: text('redacted').notNull(),
+    fingerprint: text('fingerprint').notNull(),
+    status: text('status').notNull().default('open'), // 'open' | 'resolved'
+    commitAuthor: text('commit_author'),
+    commitDate: integer('commit_date', { mode: 'timestamp_ms' }),
+    firstSeenScanId: integer('first_seen_scan_id').notNull(),
+    lastSeenScanId: integer('last_seen_scan_id').notNull(),
+    resolvedScanId: integer('resolved_scan_id'),
+    resolvedAt: integer('resolved_at', { mode: 'timestamp_ms' }),
+  },
+  (table) => [
+    uniqueIndex('secrets_project_fingerprint_unique').on(
+      table.projectId,
+      table.fingerprint,
+    ),
+    index('secrets_project_status_idx').on(table.projectId, table.status),
+  ],
+);

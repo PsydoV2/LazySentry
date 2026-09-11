@@ -1,10 +1,17 @@
-// Executes one scan end-to-end: clone → osv-scanner → persist + reconcile
-// (docs/CONCEPT.md 5.1, 4.1). Secret scanning is added in step 4.
+// Executes one scan end-to-end: clone → trufflehog → osv-scanner → persist +
+// reconcile (docs/CONCEPT.md 5.1, 4.1).
 
 import { and, eq, ne, sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { packages, projects, scans, vulnerabilities } from '../db/schema.js';
-import { vulnerabilityFingerprint } from '../lib/fingerprint.js';
+import {
+  packages,
+  projects,
+  scans,
+  secrets,
+  vulnerabilities,
+} from '../db/schema.js';
+import { secretFingerprint, vulnerabilityFingerprint } from '../lib/fingerprint.js';
+import { redactSecret } from '../lib/redact.js';
 import { classifySeverity } from '../lib/severity.js';
 import {
   getAccountToken,
@@ -23,6 +30,7 @@ import {
   type OsvScannerOutput,
   type OsvVulnerability,
 } from '../scanner/osv-scanner.js';
+import { runTruffleHog, type TruffleHogFinding } from '../scanner/trufflehog.js';
 import { SCANNER_VERSIONS } from '../scanner/versions.js';
 
 export async function runScan(
@@ -47,8 +55,7 @@ export async function runScan(
       trigger,
       startedAt,
       scannerVersions: SCANNER_VERSIONS,
-      // TruffleHog integration is step 4:
-      secretsStatus: 'skipped',
+      secretsStatus: project.scanSecretsEnabled ? 'pending' : 'skipped',
     })
     .returning({ id: scans.id })
     .get();
@@ -56,8 +63,8 @@ export async function runScan(
 
   let status = 'failed';
   let depsStatus = 'pending';
-  let errorCode: string | null = null;
-  let errorMessage: string | null = null;
+  let secretsStatus = project.scanSecretsEnabled ? 'pending' : 'skipped';
+  const failures: { code: string; message: string }[] = [];
   let commitSha: string | null = null;
 
   const scanDir = newScanDir();
@@ -74,45 +81,91 @@ export async function runScan(
       // only this scan — the UI then asks for a reconnect (CONCEPT 6.2).
       if (cloneError instanceof CloneError && cloneError.isAuthFailure && account) {
         markAccountInvalid(account.id);
-        errorCode = 'ACCOUNT_TOKEN_INVALID';
+        failures.push({ code: 'ACCOUNT_TOKEN_INVALID', message: cloneError.message });
       }
       throw cloneError;
     }
     db.update(scans).set({ commitSha }).where(eq(scans.id, scanId)).run();
+
+    if (project.scanSecretsEnabled) {
+      // The commit this project was scanned up to *before* this run — unset
+      // on the very first scan, which means "scan full history"
+      // (docs/CONCEPT.md 5.4).
+      const sinceCommit = project.lastScannedCommitSha ?? undefined;
+      const trufflehog = await runTruffleHog(scanDir, {
+        sinceCommit,
+        verify: project.verifySecretsEnabled,
+      });
+      secretsStatus = trufflehog.kind;
+      if (trufflehog.kind === 'completed') {
+        persistSecretResults(projectId, scanId, trufflehog.findings, {
+          isFullScan: sinceCommit === undefined,
+        });
+      } else {
+        failures.push({ code: 'SECRETS_SCAN_FAILED', message: trufflehog.message });
+      }
+    }
 
     const osv = await runOsvScanner(scanDir);
     depsStatus = osv.kind;
     switch (osv.kind) {
       case 'completed':
         persistDependencyResults(projectId, scanId, osv.output);
-        status = 'completed';
         break;
       case 'completed_empty':
         // No lockfiles found. Existing findings are left untouched — nothing
         // was scanned, so nothing may be marked resolved (no false green).
-        status = 'completed_with_warnings';
         break;
       case 'failed':
-        status = 'failed';
-        errorCode = 'DEPS_SCAN_FAILED';
-        errorMessage = osv.message;
+        failures.push({ code: 'DEPS_SCAN_FAILED', message: osv.message });
         break;
     }
+
+    // A scan can be partially successful (docs/CONCEPT.md 5.7): only when
+    // neither scanner produced usable results is the whole scan a failure.
+    // A skipped scanner (secrets disabled for this project) counts as "not a
+    // problem", not as a failure to fold in here.
+    const depsOk = depsStatus === 'completed';
+    const secretsOk = secretsStatus === 'completed' || secretsStatus === 'skipped';
+    if (!depsOk && !secretsOk) {
+      status = 'failed';
+    } else if (depsStatus === 'completed_empty' || failures.length > 0) {
+      status = 'completed_with_warnings';
+    } else {
+      status = 'completed';
+    }
   } catch (error) {
+    // Clone failed, or something unexpected escaped both scanner wrappers —
+    // there is nothing usable from this scan at all.
     status = 'failed';
-    errorCode = errorCode ?? 'SCAN_FAILED';
-    errorMessage = error instanceof Error ? error.message : String(error);
+    if (failures.length === 0) {
+      failures.push({
+        code: 'SCAN_FAILED',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
     if (depsStatus === 'pending') depsStatus = 'failed';
+    if (secretsStatus === 'pending') secretsStatus = 'failed';
   } finally {
     // Always remove the temp directory, also on failure (rule 4).
     await removeScanDir(scanDir);
   }
+
+  const errorCode =
+    failures.length === 0
+      ? null
+      : failures.length === 1
+        ? failures[0]!.code
+        : 'SCAN_PARTIALLY_FAILED';
+  const errorMessage =
+    failures.length === 0 ? null : failures.map((f) => f.message).join(' | ');
 
   const finishedAt = new Date();
   db.update(scans)
     .set({
       status,
       depsStatus,
+      secretsStatus,
       finishedAt,
       durationMs: finishedAt.getTime() - startedAt.getTime(),
       errorCode,
@@ -121,7 +174,14 @@ export async function runScan(
     .where(eq(scans.id, scanId))
     .run();
 
-  updateProjectAfterScan(projectId, scanId, status, finishedAt, commitSha);
+  // Only advance the incremental-scan marker once trufflehog actually
+  // covered up to this commit. Leaving it untouched after a failed or
+  // skipped secrets scan means the next run either retries the same range
+  // or (secrets scanning re-enabled later) falls back to a full-history
+  // scan instead of silently skipping everything before it
+  // (docs/CONCEPT.md 5.4).
+  const scannedCommitSha = secretsStatus === 'completed' ? commitSha : null;
+  updateProjectAfterScan(projectId, scanId, status, finishedAt, scannedCommitSha);
 
   return { scanId, status };
 }
@@ -210,6 +270,81 @@ function persistDependencyResults(
   });
 }
 
+/**
+ * Upserts secret findings keyed by (project_id, fingerprint). On a full
+ * (non-incremental) scan, open findings not seen this run are marked
+ * resolved, mirroring persistDependencyResults. On an incremental scan
+ * (`--since-commit` was used) that step is skipped entirely: a secret from
+ * earlier history does not disappear just because this run only looked at
+ * new commits (docs/CONCEPT.md 5.4).
+ *
+ * The raw secret (`finding.Raw`) is used only to derive the fingerprint and
+ * the redacted preview below — it is never assigned to a variable that
+ * outlives this loop iteration, put in an error message, or logged
+ * (docs/CONCEPT.md 4.3, rule 1).
+ */
+function persistSecretResults(
+  projectId: number,
+  scanId: number,
+  findings: TruffleHogFinding[],
+  options: { isFullScan: boolean },
+): void {
+  const now = new Date();
+  db.transaction((tx) => {
+    for (const finding of findings) {
+      const git = finding.SourceMetadata?.Data?.Git;
+      const filePath = git?.file ?? 'unknown';
+      const commitSha = git?.commit ?? 'unknown';
+      const fp = secretFingerprint(finding.DetectorName, filePath, commitSha, finding.Raw);
+      const redacted = redactSecret(finding.Raw);
+      const commitDate = git?.timestamp ? new Date(git.timestamp) : null;
+
+      tx.insert(secrets)
+        .values({
+          projectId,
+          detectorType: finding.DetectorName,
+          filePath,
+          commitSha,
+          line: git?.line ?? null,
+          isVerified: finding.Verified,
+          redacted,
+          fingerprint: fp,
+          status: 'open',
+          commitAuthor: git?.email ?? null,
+          commitDate: commitDate && !Number.isNaN(commitDate.getTime()) ? commitDate : null,
+          firstSeenScanId: scanId,
+          lastSeenScanId: scanId,
+        })
+        .onConflictDoUpdate({
+          target: [secrets.projectId, secrets.fingerprint],
+          set: {
+            isVerified: finding.Verified,
+            redacted,
+            lastSeenScanId: scanId,
+            // Finding is present again — reopen if it was resolved.
+            status: 'open',
+            resolvedScanId: null,
+            resolvedAt: null,
+          },
+        })
+        .run();
+    }
+
+    if (options.isFullScan) {
+      tx.update(secrets)
+        .set({ status: 'resolved', resolvedScanId: scanId, resolvedAt: now })
+        .where(
+          and(
+            eq(secrets.projectId, projectId),
+            eq(secrets.status, 'open'),
+            ne(secrets.lastSeenScanId, scanId),
+          ),
+        )
+        .run();
+    }
+  });
+}
+
 function updateProjectAfterScan(
   projectId: number,
   scanId: number,
@@ -233,6 +368,18 @@ function updateProjectAfterScan(
     .all();
   const bySeverity = Object.fromEntries(counts.map((c) => [c.severity, c.count]));
 
+  const secretCounts = db
+    .select({
+      isVerified: secrets.isVerified,
+      count: sql<number>`count(*)`,
+    })
+    .from(secrets)
+    .where(and(eq(secrets.projectId, projectId), eq(secrets.status, 'open')))
+    .groupBy(secrets.isVerified)
+    .all();
+  const verifiedCount = secretCounts.find((c) => c.isVerified)?.count ?? 0;
+  const unknownCount = secretCounts.find((c) => !c.isVerified)?.count ?? 0;
+
   db.update(projects)
     .set({
       lastScanId: scanId,
@@ -242,6 +389,8 @@ function updateProjectAfterScan(
       countVulnHigh: bySeverity['high'] ?? 0,
       countVulnMedium: bySeverity['medium'] ?? 0,
       countVulnLow: bySeverity['low'] ?? 0,
+      countSecretsVerified: verifiedCount,
+      countSecretsUnknown: unknownCount,
       ...(commitSha ? { lastScannedCommitSha: commitSha } : {}),
     })
     .where(eq(projects.id, projectId))

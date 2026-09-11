@@ -4,5 +4,5 @@
 
 export const SCANNER_VERSIONS = {
   'osv-scanner': '2.5.1',
-  // trufflehog is added in implementation step 4
+  trufflehog: '3.97.4',
 } as const;

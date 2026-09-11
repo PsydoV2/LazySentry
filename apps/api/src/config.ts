@@ -25,6 +25,8 @@ const envSchema = z.object({
   // Docker image copies it to /usr/local/bin); for local development point
   // this at e.g. ./tools/osv-scanner.exe via .env.
   OSV_SCANNER_PATH: z.string().default('osv-scanner'),
+  // Path to the trufflehog binary. Same convention as OSV_SCANNER_PATH above.
+  TRUFFLEHOG_PATH: z.string().default('trufflehog'),
   // Set when the app is served over HTTPS, so session cookies get `Secure`.
   HTTPS: z
     .enum(['true', 'false'])
