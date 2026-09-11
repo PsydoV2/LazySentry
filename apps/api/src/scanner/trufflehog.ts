@@ -12,6 +12,29 @@
 import { config } from '../config.js';
 import { execute } from './exec.js';
 
+/**
+ * Builds the `file://` URI trufflehog expects for a local scan directory.
+ *
+ * Deliberately not `pathToFileURL`: its RFC-8089-correct Windows output
+ * (`file:///C:/Users/...`, three slashes) trips a bug in trufflehog's own
+ * URL handling — it re-prepends the *scanning process's own* drive letter in
+ * front of the path it was given, producing `file://E:/C:/Users/...` when
+ * the worker's cwd happens to be on a different drive than scanDir —
+ * verified empirically against v3.97.4, not documented upstream. The
+ * two-slash form (`file://C:/Users/...`, drive letter directly after the
+ * scheme, no extra root slash) does not hit that path and works reliably.
+ * scanDir is always an OS-native absolute path from `newScanDir()`, so both
+ * branches below are a straight string transform, no URL parsing needed.
+ */
+export function toTruffleHogUri(scanDir: string): string {
+  if (process.platform === 'win32') {
+    return `file://${scanDir.replace(/\\/g, '/')}`;
+  }
+  // POSIX: scanDir already starts with '/', so this is exactly the
+  // three-slash RFC-8089 form shown in docs/CONCEPT.md 5.1.
+  return `file://${scanDir}`;
+}
+
 const TRUFFLEHOG_TIMEOUT_MS = 15 * 60 * 1000;
 
 // Shape of one NDJSON line from `trufflehog git ... --json` (verified
@@ -50,7 +73,7 @@ export async function runTruffleHog(
 ): Promise<TruffleHogOutcome> {
   const args = [
     'git',
-    `file://${scanDir}`,
+    toTruffleHogUri(scanDir),
     '--json',
     '--results=verified,unknown',
     // The binary is pinned to an exact version for reproducibility
