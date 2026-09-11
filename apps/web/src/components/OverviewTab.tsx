@@ -111,6 +111,7 @@ function ScanStatusPill({ scan }: { scan: Scan }) {
     completed: { label: 'Completed', className: 'pill-ok' },
     completed_with_warnings: { label: 'Completed with warnings', className: 'pill-medium' },
     failed: { label: 'Failed', className: 'pill-critical' },
+    cancelled: { label: 'Cancelled', className: 'pill-neutral' },
   }[scan.status];
   return <span className={`pill ${className}`}>{label}</span>;
 }

@@ -9,6 +9,8 @@ export function scanNotes(scan: Scan): string[] {
     return [scan.errorMessage ? `Scan failed: ${scan.errorMessage}` : 'Scan failed'];
   }
 
+  if (scan.status === 'cancelled') return ['Scan cancelled'];
+
   if (scan.status === 'running') return [];
 
   // The one combination the spec calls out verbatim.

@@ -89,26 +89,21 @@ a:hover {
 
 /* ---------- layout ---------- */
 
-.app-header {
+.dashboard-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
-  padding: var(--space-4) var(--space-6);
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
-}
-
-.app-header .brand {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-3);
+  flex-wrap: wrap;
 }
 
 .page {
   max-width: 1100px;
   margin: 0 auto;
   padding: var(--space-6);
+  /* Clears the floating avatar fixed to the top-right corner (rule: no more
+     bordered top bar, so page content has to make its own room instead). */
+  padding-top: 64px;
 }
 
 .centered-page {
@@ -356,68 +351,143 @@ button:disabled {
   overflow-y: auto;
 }
 
-/* ---------- project grid & cards (8.1) ---------- */
+/* ---------- project grid & cards (8.1) ----------
+   Portrait 9:16 tiles: a status glyph carries the at-a-glance read, pills
+   carry the breakdown, and cards keep a sane width instead of stretching to
+   fill the row (which an aspect-ratio tile would turn into extra height). */
 
 .project-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(190px, 212px));
+  justify-content: start;
   gap: var(--space-4);
 }
 
 .project-card {
+  aspect-ratio: 9 / 16;
   text-align: left;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: var(--space-4) var(--space-5);
+  padding: var(--space-4);
   cursor: pointer;
   transition: border-color 0.15s;
+  overflow: hidden;
 }
 
 .project-card:hover {
   border-color: var(--border-strong);
 }
 
-.project-card-header {
+.project-card-top {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-2);
 }
 
-.project-card-title {
+.project-card-repo {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   min-width: 0;
 }
 
-.project-card-title strong {
+.project-card-repo-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text-muted);
+}
+
+.project-card-repo-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
+.project-card-repo-text strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 13px;
 }
 
-.project-card-findings {
+.project-card-owner {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-subtle);
+  font-size: 11px;
+}
+
+.project-card-body {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  font-size: 13px;
-  min-height: 20px;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+  text-align: center;
+  min-height: 0;
 }
 
-.project-card-footer {
-  color: var(--text-subtle);
-  font-size: 12px;
+.project-card-glyph {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
 }
 
-.status-dot {
-  width: 8px;
-  height: 8px;
+.glyph-icon {
+  width: 32px;
+  height: 32px;
+}
+
+.glyph-spinner {
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
+  border: 3px solid var(--border);
+  border-top-color: var(--text-subtle);
+  animation: spin 0.8s linear infinite;
+}
+
+.project-card-headline {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  max-width: 15ch;
+}
+
+.project-card-pills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.project-card-bottom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+  color: var(--text-subtle);
+  font-size: 11px;
+}
+
+.project-card-bottom svg {
   flex-shrink: 0;
 }
 
@@ -451,41 +521,109 @@ button:disabled {
   color: var(--text);
 }
 
-/* ---------- pills / badges ---------- */
+/* Top-right scan control: a green "run" button that turns into a spinner
+   while a scan is queued/running, which itself turns into a stop button on
+   hover — same interaction Jenkins uses for its build spinners. */
+
+.scan-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--signal-ok);
+  background: color-mix(in srgb, var(--signal-ok) 16%, transparent);
+}
+
+.scan-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--signal-ok) 28%, transparent);
+}
+
+.scan-btn-busy {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  cursor: pointer;
+}
+
+.scan-btn-busy:hover {
+  color: var(--signal-critical);
+  background: color-mix(in srgb, var(--signal-critical) 16%, transparent);
+}
+
+.scan-spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-top-color: var(--accent);
+  animation: spin 0.7s linear infinite;
+}
+
+.scan-btn-busy:hover .scan-spinner {
+  display: none;
+}
+
+.scan-stop-icon {
+  display: none;
+}
+
+.scan-btn-busy:hover .scan-stop-icon {
+  display: block;
+}
+
+/* ---------- pills / badges ----------
+   Solid foreground in the signal color, translucent background of that same
+   color (fg #df2c2c-style, bg that color at ~40-50% alpha) instead of the
+   usual pastel-tint approach — colorful and vibrant on the small chips
+   rather than muted. */
 
 .pill {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
+  gap: 4px;
+  padding: 3px 9px;
   border-radius: 999px;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 11px;
+  font-weight: 600;
   white-space: nowrap;
 }
 
+.pill-icon {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
 .pill-critical {
-  background: #fde8e8;
-  color: #a11d1d;
+  color: var(--signal-critical);
+  background: color-mix(in srgb, var(--signal-critical) 45%, transparent);
 }
 
 .pill-high {
-  background: #fef3e0;
-  color: #92400e;
+  color: var(--signal-high);
+  background: color-mix(in srgb, var(--signal-high) 40%, transparent);
 }
 
 .pill-medium {
-  background: #fef9e0;
-  color: #854d0e;
+  /* Plain yellow text stays illegible no matter the trend — darkened a step
+     while the background keeps the same translucent-yellow treatment. */
+  color: #8a6212;
+  background: color-mix(in srgb, var(--signal-medium) 45%, transparent);
 }
 
 .pill-info {
-  background: #e0f2fe;
-  color: #075985;
+  color: var(--signal-info);
+  background: color-mix(in srgb, var(--signal-info) 30%, transparent);
 }
 
 .pill-ok {
-  background: #e3f9ef;
-  color: #087f5b;
+  color: var(--signal-ok);
+  background: color-mix(in srgb, var(--signal-ok) 28%, transparent);
 }
 
 .pill-neutral {
@@ -692,4 +830,82 @@ button:disabled {
 
 .step-dot.is-active {
   background: var(--accent);
+}
+
+/* ---------- user menu ----------
+   Replaces the old top bar: a round avatar placeholder fixed to the
+   top-right corner of every screen, opening onto Settings and sign-out. */
+
+.user-menu {
+  position: fixed;
+  top: 16px;
+  right: 20px;
+  z-index: 5;
+}
+
+.user-menu-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--accent-subtle);
+  color: var(--accent);
+}
+
+.user-menu-avatar:hover {
+  background: color-mix(in srgb, var(--accent) 18%, var(--accent-subtle));
+}
+
+.user-menu-avatar svg {
+  width: 18px;
+  height: 18px;
+}
+
+.user-menu-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 190px;
+  padding: var(--space-2);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 24px rgb(32 30 28 / 12%);
+  z-index: 6;
+}
+
+.user-menu-name {
+  padding: var(--space-2) var(--space-3);
+  font-weight: 600;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  font-size: 13px;
+}
+
+.user-menu-item:hover:not(:disabled) {
+  background: var(--bg);
+}
+
+.user-menu-item-danger:hover:not(:disabled) {
+  color: #8f2e22;
+  background: #fdf5f4;
 }

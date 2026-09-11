@@ -9,13 +9,15 @@ export type CardState =
   | 'scanning'
   | 'completed'
   | 'completed_with_warnings'
-  | 'failed';
+  | 'failed'
+  | 'cancelled';
 
 export function cardStateFor(project: Project): CardState {
   if (project.scanState === 'running') return 'scanning';
   if (project.scanState === 'queued') return 'queued';
   if (project.lastScanStatus === null) return 'never_scanned';
   if (project.lastScanStatus === 'failed') return 'failed';
+  if (project.lastScanStatus === 'cancelled') return 'cancelled';
   if (project.lastScanStatus === 'completed_with_warnings') {
     return 'completed_with_warnings';
   }
@@ -44,7 +46,7 @@ export function urgencyRank(project: Project, state: CardState): number {
     if (otherFindings > 0) return 2;
     return 3; // clean
   }
-  if (state === 'failed') return 4;
+  if (state === 'failed' || state === 'cancelled') return 4;
   if (state === 'scanning' || state === 'queued') return 5;
   return 6; // never_scanned
 }

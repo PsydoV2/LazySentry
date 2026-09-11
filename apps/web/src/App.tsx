@@ -1,9 +1,11 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { UserMenu } from './components/UserMenu';
 import { api, ApiError, type CurrentUser, type SetupStatus } from './lib/api';
 import { useRoute } from './lib/router';
 import { Dashboard } from './views/Dashboard';
 import { Login } from './views/Login';
 import { ProjectDetail } from './views/ProjectDetail';
+import { Settings } from './views/Settings';
 import { SetupWizard } from './views/SetupWizard';
 
 export function App() {
@@ -65,20 +67,43 @@ export function App() {
     return <SetupWizard status={setup.data} onComplete={invalidateAll} />;
   }
 
+  // The avatar in the corner is the only piece of chrome shared by every
+  // screen now that the top bar is gone — rendered once here rather than in
+  // each view (docs/CONCEPT.md 8.0).
+  const userMenu = (
+    <UserMenu user={session.data} navigate={navigate} onSignedOut={invalidateAll} />
+  );
+
   if (route.name === 'project') {
     return (
-      // Keyed on the id so navigating from one project straight to another
-      // remounts the view — otherwise the active tab (and each tab's own
-      // filter state) would carry over from the previous project.
-      <ProjectDetail
-        key={route.id}
-        projectId={route.id}
-        onBack={() => navigate({ name: 'dashboard' })}
-      />
+      <>
+        {userMenu}
+        {/* Keyed on the id so navigating from one project straight to
+            another remounts the view — otherwise the active tab (and each
+            tab's own filter state) would carry over from the previous
+            project. */}
+        <ProjectDetail
+          key={route.id}
+          projectId={route.id}
+          onBack={() => navigate({ name: 'dashboard' })}
+        />
+      </>
+    );
+  }
+
+  if (route.name === 'settings') {
+    return (
+      <>
+        {userMenu}
+        <Settings onBack={() => navigate({ name: 'dashboard' })} />
+      </>
     );
   }
 
   return (
-    <Dashboard user={session.data} onSignedOut={invalidateAll} navigate={navigate} />
+    <>
+      {userMenu}
+      <Dashboard navigate={navigate} />
+    </>
   );
 }

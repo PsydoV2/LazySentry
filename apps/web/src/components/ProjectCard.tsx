@@ -1,10 +1,27 @@
 // Dashboard grid card (docs/CONCEPT.md 8.1). Color signals urgency, not
 // severity — a verified secret is always red regardless of what else the
-// project has going on.
+// project has going on. Portrait 9:16 tile: a status glyph carries the
+// at-a-glance read, pills carry the breakdown, icons stand in for labels
+// wherever a glance should be enough.
 
+import type { ComponentType, MouseEvent } from 'react';
 import type { Project } from '@lazysentry/shared';
 import { cardStateFor, urgencyRank, type CardState } from '../lib/card-state';
 import { relativeTime } from '../lib/format';
+import {
+  IconAlertTriangle,
+  IconBug,
+  IconClock,
+  IconFolder,
+  IconGithub,
+  IconKey,
+  IconLock,
+  IconPackage,
+  IconPlay,
+  IconShieldAlert,
+  IconShieldCheck,
+  IconStop,
+} from './icons';
 
 const STATE_COLOR: Record<number, string> = {
   0: 'var(--signal-critical)',
@@ -16,37 +33,29 @@ const STATE_COLOR: Record<number, string> = {
   6: 'var(--border-strong)',
 };
 
-function stateLabel(state: CardState, errorMessage: string | null): string {
-  switch (state) {
-    case 'never_scanned':
-      return 'Never scanned';
-    case 'queued':
-      return 'Queued';
-    case 'scanning':
-      return 'Scanning…';
-    case 'completed_with_warnings':
-      return 'Completed with warnings';
-    case 'failed':
-      return errorMessage ? `Scan failed: ${errorMessage}` : 'Scan failed';
-    case 'completed':
-      return 'Completed';
-  }
+/** Everything before the first "/" of "owner/repo" — the caption under the name. */
+function ownerOf(fullName: string): string {
+  const slash = fullName.indexOf('/');
+  return slash === -1 ? fullName : fullName.slice(0, slash);
 }
 
 export function ProjectCard({
   project,
   onOpen,
   onScanNow,
+  onCancelScan,
   scanDisabled,
 }: {
   project: Project;
   onOpen: () => void;
   onScanNow: () => void;
+  onCancelScan: () => void;
   scanDisabled: boolean;
 }) {
   const state = cardStateFor(project);
   const rank = urgencyRank(project, state);
-  const dotColor = STATE_COLOR[rank];
+  // rank is always one of the keys STATE_COLOR defines (0-6).
+  const accentColor = STATE_COLOR[rank]!;
   const isBusy = state === 'queued' || state === 'scanning';
 
   return (
@@ -59,83 +68,219 @@ export function ProjectCard({
         if (event.key === 'Enter' || event.key === ' ') onOpen();
       }}
     >
-      <div className="project-card-header">
-        <div className="project-card-title">
-          {isBusy ? (
-            <span className="spinner" aria-hidden="true" />
-          ) : (
-            <span
-              className="status-dot"
-              style={{ background: dotColor }}
-              aria-hidden="true"
-            />
-          )}
-          <strong title={project.name}>{project.name}</strong>
+      <div className="project-card-top">
+        <div className="project-card-repo">
+          <span className="project-card-repo-icon" aria-hidden="true">
+            {project.isPrivate ? <IconLock /> : <IconGithub />}
+          </span>
+          <span className="project-card-repo-text">
+            <strong title={project.name}>{project.name}</strong>
+            <span className="project-card-owner">{ownerOf(project.fullName)}</span>
+          </span>
         </div>
-        <button
-          type="button"
-          className="icon-btn"
-          title="Scan now"
-          aria-label={`Scan ${project.name} now`}
-          disabled={scanDisabled || project.scanState !== 'idle'}
-          onClick={(event) => {
+
+        <ScanControl
+          projectName={project.name}
+          isBusy={isBusy}
+          disabled={scanDisabled}
+          onScan={(event) => {
             event.stopPropagation();
             onScanNow();
           }}
-        >
-          ⋯
-        </button>
+          onCancel={(event) => {
+            event.stopPropagation();
+            onCancelScan();
+          }}
+        />
       </div>
 
-      <span className="subtle">{project.fullName}</span>
-
-      <div className="project-card-findings">
-        <FindingLines project={project} state={state} />
+      <div className="project-card-body">
+        <StatusGlyph project={project} state={state} color={accentColor} />
+        <div className="project-card-pills">
+          <FindingPills project={project} state={state} />
+        </div>
       </div>
 
-      <span
-        className="project-card-footer"
+      <div
+        className="project-card-bottom"
         title={
           state === 'failed'
-            ? stateLabel(state, project.lastScanErrorMessage)
+            ? (project.lastScanErrorMessage ?? undefined)
             : undefined
         }
       >
-        {state === 'queued' || state === 'scanning'
-          ? stateLabel(state, null)
-          : state === 'never_scanned'
-            ? 'Added ' + relativeTime(project.addedAt)
-            : `Last scan ${relativeTime(project.lastScanAt)}`}
+        <IconClock aria-hidden="true" />
+        <span>
+          {state === 'queued' || state === 'scanning'
+            ? state === 'queued'
+              ? 'Waiting in queue'
+              : 'Scan in progress'
+            : state === 'never_scanned'
+              ? 'Added ' + relativeTime(project.addedAt)
+              : `Last scan ${relativeTime(project.lastScanAt)}`}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function ScanControl({
+  projectName,
+  isBusy,
+  disabled,
+  onScan,
+  onCancel,
+}: {
+  projectName: string;
+  isBusy: boolean;
+  disabled: boolean;
+  onScan: (event: MouseEvent) => void;
+  onCancel: (event: MouseEvent) => void;
+}) {
+  if (!isBusy) {
+    return (
+      <button
+        type="button"
+        className="scan-btn"
+        title="Scan now"
+        aria-label={`Scan ${projectName} now`}
+        disabled={disabled}
+        onClick={onScan}
+      >
+        <IconPlay />
+      </button>
+    );
+  }
+
+  // Hovering the spinner swaps it for a stop control, Jenkins-style — the
+  // button itself never moves, only what's inside it.
+  return (
+    <button
+      type="button"
+      className="scan-btn scan-btn-busy"
+      title="Stop scan"
+      aria-label={`Stop scanning ${projectName}`}
+      onClick={onCancel}
+    >
+      <span className="scan-spinner" aria-hidden="true" />
+      <IconStop className="scan-stop-icon" />
+    </button>
+  );
+}
+
+const STATE_ICON: Partial<Record<CardState, ComponentType<{ className?: string }>>> = {
+  never_scanned: IconFolder,
+  failed: IconAlertTriangle,
+  cancelled: IconStop,
+};
+
+/** Big centered glyph + one-line headline — the card's at-a-glance read. */
+function StatusGlyph({
+  project,
+  state,
+  color,
+}: {
+  project: Project;
+  state: CardState;
+  color: string;
+}) {
+  if (state === 'scanning' || state === 'queued') {
+    return (
+      <div className="project-card-glyph" style={{ color: 'var(--text-subtle)' }}>
+        <span className="glyph-spinner" aria-hidden="true" />
+        <span className="project-card-headline">
+          {state === 'scanning' ? 'Scanning…' : 'Queued'}
+        </span>
+      </div>
+    );
+  }
+
+  if (state === 'never_scanned' || state === 'failed' || state === 'cancelled') {
+    const Icon = STATE_ICON[state]!;
+    return (
+      <div className="project-card-glyph" style={{ color }}>
+        <Icon className="glyph-icon" />
+        <span className="project-card-headline">
+          {state === 'never_scanned'
+            ? 'Not scanned yet'
+            : state === 'failed'
+              ? 'Scan failed'
+              : 'Scan cancelled'}
+        </span>
+      </div>
+    );
+  }
+
+  // completed / completed_with_warnings: lead with the single most urgent
+  // signal, same priority order the pills below use in full.
+  if (project.countSecretsVerified > 0) {
+    return (
+      <div className="project-card-glyph" style={{ color }}>
+        <IconShieldAlert className="glyph-icon" />
+        <span className="project-card-headline">
+          {project.countSecretsVerified} verified secret
+          {project.countSecretsVerified === 1 ? '' : 's'}
+        </span>
+      </div>
+    );
+  }
+  if (project.countVulnCritical > 0) {
+    return (
+      <div className="project-card-glyph" style={{ color }}>
+        <IconBug className="glyph-icon" />
+        <span className="project-card-headline">
+          {project.countVulnCritical} critical vulnerabilit
+          {project.countVulnCritical === 1 ? 'y' : 'ies'}
+        </span>
+      </div>
+    );
+  }
+  const otherFindings =
+    project.countVulnHigh +
+    project.countVulnMedium +
+    project.countVulnLow +
+    project.countOutdatedMajor +
+    project.countOutdatedMinor +
+    project.countOutdatedPatch +
+    project.countSecretsUnknown;
+  if (otherFindings > 0) {
+    return (
+      <div className="project-card-glyph" style={{ color }}>
+        <IconBug className="glyph-icon" />
+        <span className="project-card-headline">Needs attention</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="project-card-glyph" style={{ color }}>
+      <IconShieldCheck className="glyph-icon" />
+      <span className="project-card-headline">
+        {state === 'completed_with_warnings' ? 'Completed with warnings' : 'All clear'}
       </span>
     </div>
   );
 }
 
-function FindingLines({
-  project,
-  state,
-}: {
-  project: Project;
-  state: CardState;
-}) {
-  if (state === 'never_scanned') {
-    return <span className="muted">Not scanned yet</span>;
-  }
-  if (state === 'failed') {
-    return (
-      <span style={{ color: 'var(--signal-critical)' }}>
-        {project.lastScanErrorMessage ?? 'Scan failed'}
-      </span>
-    );
+function FindingPills({ project, state }: { project: Project; state: CardState }) {
+  if (
+    state === 'never_scanned' ||
+    state === 'failed' ||
+    state === 'cancelled' ||
+    state === 'queued' ||
+    state === 'scanning'
+  ) {
+    return null;
   }
 
-  const lines: { color: string; label: string }[] = [];
+  const pills: { key: string; tone: string; icon: ComponentType<{ className?: string }>; label: string }[] = [];
+
   if (project.countSecretsVerified > 0) {
-    lines.push({
-      color: 'var(--signal-critical)',
-      label: `${project.countSecretsVerified} verified secret${
-        project.countSecretsVerified === 1 ? '' : 's'
-      }`,
+    pills.push({
+      key: 'secrets-verified',
+      tone: 'critical',
+      icon: IconShieldAlert,
+      label: `${project.countSecretsVerified} secret${project.countSecretsVerified === 1 ? '' : 's'}`,
     });
   }
   const vulns =
@@ -144,56 +289,43 @@ function FindingLines({
     project.countVulnMedium +
     project.countVulnLow;
   if (vulns > 0) {
-    lines.push({
-      color:
+    pills.push({
+      key: 'vulns',
+      tone: project.countVulnCritical > 0 ? 'high' : 'info',
+      icon: IconBug,
+      label:
         project.countVulnCritical > 0
-          ? 'var(--signal-high)'
-          : 'var(--signal-info)',
-      label: `${vulns} vulnerabilit${vulns === 1 ? 'y' : 'ies'}${
-        project.countVulnCritical > 0
-          ? ` (${project.countVulnCritical} critical)`
-          : ''
-      }`,
+          ? `${vulns} vuln${vulns === 1 ? '' : 's'} · ${project.countVulnCritical} crit`
+          : `${vulns} vuln${vulns === 1 ? '' : 's'}`,
     });
   }
   const outdated =
-    project.countOutdatedMajor +
-    project.countOutdatedMinor +
-    project.countOutdatedPatch;
+    project.countOutdatedMajor + project.countOutdatedMinor + project.countOutdatedPatch;
   if (outdated > 0) {
-    lines.push({
-      color: 'var(--signal-info)',
-      label: `${outdated} outdated${
-        project.countOutdatedMajor > 0
-          ? ` (${project.countOutdatedMajor} major)`
-          : ''
-      }`,
+    pills.push({
+      key: 'outdated',
+      tone: 'info',
+      icon: IconPackage,
+      label: `${outdated} outdated${project.countOutdatedMajor > 0 ? ` · ${project.countOutdatedMajor} major` : ''}`,
     });
   }
   if (project.countSecretsUnknown > 0) {
-    lines.push({
-      color: 'var(--signal-medium)',
-      label: `${project.countSecretsUnknown} unverified secret${
-        project.countSecretsUnknown === 1 ? '' : 's'
-      }`,
+    pills.push({
+      key: 'secrets-unknown',
+      tone: 'medium',
+      icon: IconKey,
+      label: `${project.countSecretsUnknown} unverified`,
     });
   }
 
-  if (lines.length === 0) {
-    return (
-      <span style={{ color: 'var(--signal-ok)' }}>
-        {state === 'completed_with_warnings'
-          ? 'Nothing found — scan completed with warnings'
-          : 'Nothing found'}
-      </span>
-    );
-  }
+  if (pills.length === 0) return null;
 
   return (
     <>
-      {lines.map((line) => (
-        <span key={line.label} style={{ color: line.color }}>
-          {line.label}
+      {pills.map(({ key, tone, icon: Icon, label }) => (
+        <span key={key} className={`pill pill-${tone}`}>
+          <Icon className="pill-icon" />
+          {label}
         </span>
       ))}
     </>
