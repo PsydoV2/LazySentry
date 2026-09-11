@@ -53,6 +53,12 @@ export async function runTruffleHog(
     `file://${scanDir}`,
     '--json',
     '--results=verified,unknown',
+    // The binary is pinned to an exact version for reproducibility
+    // (docs/CONCEPT.md 3.2) — trufflehog's own self-updater must never
+    // silently replace it. On Windows this also fails outright with an
+    // EBUSY-style "file in use" error since the running process still
+    // holds its own executable open.
+    '--no-update',
   ];
   if (options.sinceCommit) {
     args.push(`--since-commit=${options.sinceCommit}`);
