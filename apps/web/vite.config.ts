@@ -1,7 +1,26 @@
-import { defineConfig } from 'vite';
+import { createLogger, defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
+/**
+ * The browser's EventSource on /api/events (docs/CONCEPT.md 3.5) reconnects
+ * by itself, which in development means it keeps retrying while the API
+ * process is still booting or restarting on a file change. Vite logs every
+ * such attempt as a proxy error with a stack trace, so a normal `pnpm dev`
+ * starts with a wall of noise about a condition that resolves itself within
+ * seconds. Only connection-refused proxy errors are dropped — a proxy error
+ * with any other cause still reaches the console.
+ */
+const logger = createLogger();
+const logError = logger.error.bind(logger);
+logger.error = (message, options) => {
+  if (message.includes('http proxy error') && message.includes('ECONNREFUSED')) {
+    return;
+  }
+  logError(message, options);
+};
+
 export default defineConfig({
+  customLogger: logger,
   plugins: [react()],
   server: {
     // In development the Fastify API runs separately; proxy API calls to it.
