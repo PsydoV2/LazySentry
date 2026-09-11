@@ -67,9 +67,12 @@ cp .env.example .env        # then fill in APP_ENCRYPTION_KEY (see comments in t
 pnpm dev                    # starts the API (127.0.0.1:3000), the scan worker and the web dev server
 ```
 
-Scans are executed by the **worker** process, not by the API — a queued scan
-stays queued until a worker is running. `pnpm dev` starts one; on its own it
-is `pnpm --filter @lazysentry/api dev:worker`.
+Scans are executed by the **worker**, not by the API — a queued scan stays
+queued until a worker is running. In development both run in one process
+(`node dist/main.js --with-worker`, see `docs/CONCEPT.md` 0.2), which is what
+`pnpm dev` starts. To run them separately, use `dev:api` and `dev:worker` in
+`apps/api`; production runs `node dist/api.js` and `node dist/worker.js` as
+two services on the same image.
 
 For local development the worker needs both scanner binaries. Download a
 pinned release of [osv-scanner](https://github.com/google/osv-scanner/releases)

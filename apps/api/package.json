@@ -4,7 +4,8 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/api.ts",
+    "dev": "tsx watch src/main.ts --with-worker",
+    "dev:api": "tsx watch src/api.ts",
     "dev:worker": "tsx watch src/worker.ts",
     "db:generate": "drizzle-kit generate",
     "scan:once": "tsx src/scripts/scan-once.ts",
