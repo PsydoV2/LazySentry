@@ -29,6 +29,13 @@
       "when": 1789133866017,
       "tag": "0003_parallel_captain_america",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1789135053825,
+      "tag": "0004_lucky_hawkeye",
+      "breakpoints": true
     }
   ]
 }

@@ -40,6 +40,9 @@ importers:
       fastify:
         specifier: ^5.0.0
         version: 5.12.3
+      semver:
+        specifier: ^7.8.5
+        version: 7.8.5
       zod:
         specifier: ^4.0.0
         version: 4.6.0
@@ -50,6 +53,9 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.2
+      '@types/semver':
+        specifier: ^7.8.0
+        version: 7.8.0
       drizzle-kit:
         specifier: ^0.31.0
         version: 0.31.10
@@ -61,7 +67,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^5.0.0
-        version: 5.0.0(@types/node@22.20.2)(vite@8.2.2(@types/node@22.20.2))
+        version: 5.0.0(@types/node@22.20.2)(vite@8.2.2(@types/node@22.20.2)(esbuild@0.28.2)(tsx@4.23.13))
 
   apps/web:
     dependencies:
@@ -95,7 +101,7 @@ importers:
         version: 8.2.2(@types/node@22.20.2)(esbuild@0.28.2)(tsx@4.23.13)
       vitest:
         specifier: ^5.0.0
-        version: 5.0.0(@types/node@22.20.2)(vite@8.2.2(@types/node@22.20.2))
+        version: 5.0.0(@types/node@22.20.2)(vite@8.2.2(@types/node@22.20.2)(esbuild@0.28.2)(tsx@4.23.13))
 
   packages/shared:
     dependencies:
@@ -108,7 +114,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^5.0.0
-        version: 5.0.0(@types/node@22.20.2)(vite@8.2.2(@types/node@22.20.2))
+        version: 5.0.0(@types/node@22.20.2)(vite@8.2.2(@types/node@22.20.2)(esbuild@0.28.2)(tsx@4.23.13))
 
 packages:
 
@@ -762,6 +768,9 @@ packages:
 
   '@types/react@19.3.0':
     resolution: {integrity: sha512-N0rFCuH9YoxG9/m61l9MfpJKfmLOVU0em7ipIz6TRgSSkvReLB9vL85GB+yr8Bs5leqpvg96JSwF4ZS1s4viQg==}
+
+  '@types/semver@7.8.0':
+    resolution: {integrity: sha512-1mAINjtQCXXeLkJ9ehXkwOcBpqtLxiVtKhpUf83DdRNdQKV0iXZpaHYqRr7nj+wvxuJzoAmAwXI+sCNMv1CzLQ==}
 
   '@vitejs/plugin-react@6.1.1':
     resolution: {integrity: sha512-yxLaQV9gkhS8ezJqCM6+ndU7mDY6gqAg75NQ+0IjwEI8IYOmQCgkRwHKVSfWXW076DsqMo0Dk+0FK1U+M5RgFw==}
@@ -1985,12 +1994,14 @@ snapshots:
     dependencies:
       csstype: 3.2.3
 
+  '@types/semver@7.8.0': {}
+
   '@vitejs/plugin-react@6.1.1(vite@8.2.2(@types/node@22.20.2)(esbuild@0.28.2)(tsx@4.23.13))':
     dependencies:
       '@rolldown/pluginutils': 1.0.1
       vite: 8.2.2(@types/node@22.20.2)(esbuild@0.28.2)(tsx@4.23.13)
 
-  '@vitest/mocker@5.0.0(vite@8.2.2(@types/node@22.20.2))':
+  '@vitest/mocker@5.0.0(vite@8.2.2(@types/node@22.20.2)(esbuild@0.28.2)(tsx@4.23.13))':
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
       '@vitest/spy': 5.0.0
@@ -2643,10 +2654,10 @@ snapshots:
       fsevents: 2.3.3
       tsx: 4.23.13
 
-  vitest@5.0.0(@types/node@22.20.2)(vite@8.2.2(@types/node@22.20.2)):
+  vitest@5.0.0(@types/node@22.20.2)(vite@8.2.2(@types/node@22.20.2)(esbuild@0.28.2)(tsx@4.23.13)):
     dependencies:
       '@types/chai': 5.2.3
-      '@vitest/mocker': 5.0.0(vite@8.2.2(@types/node@22.20.2))
+      '@vitest/mocker': 5.0.0(vite@8.2.2(@types/node@22.20.2)(esbuild@0.28.2)(tsx@4.23.13))
       chai: 6.2.2
       es-module-lexer: 2.3.2
       expect-type: 1.4.0

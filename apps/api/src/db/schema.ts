@@ -192,6 +192,31 @@ export const vulnerabilities = sqliteTable(
   ],
 );
 
+/**
+ * Registry response cache (docs/CONCEPT.md 5.3): "latest version" lookups
+ * are cached per ecosystem+package for 24h so a scan of a large dependency
+ * tree does not fire hundreds of near-identical HTTP requests. A plain
+ * SQLite table rather than an in-memory cache — it must survive worker
+ * restarts and be shared if the API process ever queries it too.
+ */
+export const registryCache = sqliteTable(
+  'registry_cache',
+  {
+    ecosystem: text('ecosystem').notNull(),
+    packageName: text('package_name').notNull(),
+    // Null means "looked up, but the registry had no answer" (e.g. 404) —
+    // distinct from "never looked up" (no row at all).
+    latestVersion: text('latest_version'),
+    fetchedAt: integer('fetched_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('registry_cache_ecosystem_package_unique').on(
+      table.ecosystem,
+      table.packageName,
+    ),
+  ],
+);
+
 export const secrets = sqliteTable(
   'secrets',
   {

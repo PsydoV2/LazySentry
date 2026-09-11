@@ -32,6 +32,11 @@ import {
 } from '../scanner/osv-scanner.js';
 import { runTruffleHog, type TruffleHogFinding } from '../scanner/trufflehog.js';
 import { SCANNER_VERSIONS } from '../scanner/versions.js';
+import {
+  auditPackageVersions,
+  cacheKey,
+  type VersionAuditResult,
+} from './version-audit.js';
 
 export async function runScan(
   projectId: number,
@@ -109,9 +114,14 @@ export async function runScan(
     const osv = await runOsvScanner(scanDir);
     depsStatus = osv.kind;
     switch (osv.kind) {
-      case 'completed':
-        persistDependencyResults(projectId, scanId, osv.output);
+      case 'completed': {
+        // Registry lookups are async; better-sqlite3 transactions are not
+        // (docs/CONCEPT.md 0.3), so every lookup happens before the
+        // synchronous persist step below even opens one.
+        const versions = await auditPackageVersions(collectPackageRefs(osv.output));
+        persistDependencyResults(projectId, scanId, osv.output, versions);
         break;
+      }
       case 'completed_empty':
         // No lockfiles found. Existing findings are left untouched — nothing
         // was scanned, so nothing may be marked resolved (no false green).
@@ -181,25 +191,52 @@ export async function runScan(
   // scan instead of silently skipping everything before it
   // (docs/CONCEPT.md 5.4).
   const scannedCommitSha = secretsStatus === 'completed' ? commitSha : null;
-  updateProjectAfterScan(projectId, scanId, status, finishedAt, scannedCommitSha);
+  updateProjectAfterScan(projectId, scanId, status, finishedAt, scannedCommitSha, {
+    // Package rows are a per-scan snapshot, not reconciled like findings
+    // (5.4/4.1) — if this scan didn't produce a fresh inventory (no
+    // lockfiles, or the deps scanner failed), there are 0 rows for this
+    // scanId. Recomputing the outdated counts from that would wipe out a
+    // perfectly good previous count for no reason.
+    hasFreshPackageInventory: depsStatus === 'completed',
+  });
 
   return { scanId, status };
 }
 
+/** Every (ecosystem, name, installed version) triple in the inventory, for the version audit. */
+function collectPackageRefs(
+  output: OsvScannerOutput,
+): { ecosystem: string; name: string; versionInstalled: string }[] {
+  const refs: { ecosystem: string; name: string; versionInstalled: string }[] = [];
+  for (const result of output.results ?? []) {
+    for (const entry of result.packages) {
+      refs.push({
+        ecosystem: entry.package.ecosystem,
+        name: entry.package.name,
+        versionInstalled: entry.package.version,
+      });
+    }
+  }
+  return refs;
+}
+
 /**
- * Writes the package inventory and upserts vulnerabilities keyed by
- * (project_id, fingerprint), then marks findings not seen in this scan as
- * resolved — all in one transaction (docs/CONCEPT.md 4.1).
+ * Writes the package inventory (including the version-audit result looked
+ * up beforehand) and upserts vulnerabilities keyed by (project_id,
+ * fingerprint), then marks findings not seen in this scan as resolved — all
+ * in one transaction (docs/CONCEPT.md 4.1).
  */
 function persistDependencyResults(
   projectId: number,
   scanId: number,
   output: OsvScannerOutput,
+  versions: Map<string, VersionAuditResult>,
 ): void {
   const now = new Date();
   db.transaction((tx) => {
     for (const result of output.results ?? []) {
       for (const entry of result.packages) {
+        const audit = versions.get(cacheKey(entry.package.ecosystem, entry.package.name));
         const packageRow = tx
           .insert(packages)
           .values({
@@ -207,6 +244,8 @@ function persistDependencyResults(
             ecosystem: entry.package.ecosystem,
             name: entry.package.name,
             versionInstalled: entry.package.version,
+            versionLatest: audit?.versionLatest ?? null,
+            updateType: audit?.updateType ?? 'unknown',
             sourceFile: result.source.path,
           })
           .returning({ id: packages.id })
@@ -351,6 +390,7 @@ function updateProjectAfterScan(
   status: string,
   finishedAt: Date,
   commitSha: string | null,
+  options: { hasFreshPackageInventory: boolean },
 ): void {
   const counts = db
     .select({
@@ -380,6 +420,33 @@ function updateProjectAfterScan(
   const verifiedCount = secretCounts.find((c) => c.isVerified)?.count ?? 0;
   const unknownCount = secretCounts.find((c) => !c.isVerified)?.count ?? 0;
 
+  // Packages aren't reconciled across scans the way findings are (5.4/4.1) —
+  // each scan's rows are its own inventory snapshot — so "outdated" counts
+  // come from this scan only, not a project-wide open/resolved status. Only
+  // recomputed when this scan actually produced a fresh inventory.
+  let outdatedCounts: Partial<{
+    countOutdatedMajor: number;
+    countOutdatedMinor: number;
+    countOutdatedPatch: number;
+  }> = {};
+  if (options.hasFreshPackageInventory) {
+    const updateCounts = db
+      .select({
+        updateType: packages.updateType,
+        count: sql<number>`count(*)`,
+      })
+      .from(packages)
+      .where(eq(packages.scanId, scanId))
+      .groupBy(packages.updateType)
+      .all();
+    const byUpdateType = Object.fromEntries(updateCounts.map((c) => [c.updateType, c.count]));
+    outdatedCounts = {
+      countOutdatedMajor: byUpdateType['major'] ?? 0,
+      countOutdatedMinor: byUpdateType['minor'] ?? 0,
+      countOutdatedPatch: byUpdateType['patch'] ?? 0,
+    };
+  }
+
   db.update(projects)
     .set({
       lastScanId: scanId,
@@ -391,6 +458,7 @@ function updateProjectAfterScan(
       countVulnLow: bySeverity['low'] ?? 0,
       countSecretsVerified: verifiedCount,
       countSecretsUnknown: unknownCount,
+      ...outdatedCounts,
       ...(commitSha ? { lastScannedCommitSha: commitSha } : {}),
     })
     .where(eq(projects.id, projectId))
