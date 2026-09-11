@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { fingerprint, vulnerabilityFingerprint } from './fingerprint.js';
+import {
+  fingerprint,
+  secretFingerprint,
+  vulnerabilityFingerprint,
+} from './fingerprint.js';
 
 describe('fingerprint', () => {
   it('is stable across calls', () => {
@@ -17,5 +21,19 @@ describe('fingerprint', () => {
     const packagist = vulnerabilityFingerprint('Packagist', 'lodash', 'GHSA-x');
     const other = vulnerabilityFingerprint('npm', 'underscore', 'GHSA-x');
     expect(new Set([npm, packagist, other]).size).toBe(3);
+  });
+});
+
+describe('secretFingerprint', () => {
+  it('distinguishes two different credentials on the same line of the same commit', () => {
+    const first = secretFingerprint('AWS', 'src/config.js', 'abc123', 'AKIA_ONE');
+    const second = secretFingerprint('AWS', 'src/config.js', 'abc123', 'AKIA_TWO');
+    expect(first).not.toBe(second);
+  });
+
+  it('is stable for the same finding', () => {
+    const a = secretFingerprint('GitHub', 'a.env', 'sha1', 'ghp_secret');
+    const b = secretFingerprint('GitHub', 'a.env', 'sha1', 'ghp_secret');
+    expect(a).toBe(b);
   });
 });

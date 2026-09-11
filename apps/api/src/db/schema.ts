@@ -191,3 +191,63 @@ export const vulnerabilities = sqliteTable(
     index('vulns_project_status_idx').on(table.projectId, table.status),
   ],
 );
+
+/**
+ * Registry response cache (docs/CONCEPT.md 5.3): "latest version" lookups
+ * are cached per ecosystem+package for 24h so a scan of a large dependency
+ * tree does not fire hundreds of near-identical HTTP requests. A plain
+ * SQLite table rather than an in-memory cache — it must survive worker
+ * restarts and be shared if the API process ever queries it too.
+ */
+export const registryCache = sqliteTable(
+  'registry_cache',
+  {
+    ecosystem: text('ecosystem').notNull(),
+    packageName: text('package_name').notNull(),
+    // Null means "looked up, but the registry had no answer" (e.g. 404) —
+    // distinct from "never looked up" (no row at all).
+    latestVersion: text('latest_version'),
+    fetchedAt: integer('fetched_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('registry_cache_ecosystem_package_unique').on(
+      table.ecosystem,
+      table.packageName,
+    ),
+  ],
+);
+
+export const secrets = sqliteTable(
+  'secrets',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    projectId: integer('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    detectorType: text('detector_type').notNull(),
+    filePath: text('file_path').notNull(),
+    commitSha: text('commit_sha').notNull(),
+    line: integer('line'),
+    isVerified: integer('is_verified', { mode: 'boolean' })
+      .notNull()
+      .default(false),
+    // First 4 + last 4 characters of the raw secret, rest masked — never the
+    // raw value itself (docs/CONCEPT.md 4.3, rule 1).
+    redacted: text('redacted').notNull(),
+    fingerprint: text('fingerprint').notNull(),
+    status: text('status').notNull().default('open'), // 'open' | 'resolved'
+    commitAuthor: text('commit_author'),
+    commitDate: integer('commit_date', { mode: 'timestamp_ms' }),
+    firstSeenScanId: integer('first_seen_scan_id').notNull(),
+    lastSeenScanId: integer('last_seen_scan_id').notNull(),
+    resolvedScanId: integer('resolved_scan_id'),
+    resolvedAt: integer('resolved_at', { mode: 'timestamp_ms' }),
+  },
+  (table) => [
+    uniqueIndex('secrets_project_fingerprint_unique').on(
+      table.projectId,
+      table.fingerprint,
+    ),
+    index('secrets_project_status_idx').on(table.projectId, table.status),
+  ],
+);
