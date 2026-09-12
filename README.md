@@ -6,21 +6,15 @@ One `docker compose up -d`, one browser tab — and for every repository you car
 
 - 🛡️ **Vulnerabilities** — all direct and transitive dependencies checked against the [OSV database](https://osv.dev)
 - 📦 **Outdated packages** — installed vs. latest registry version, classified as patch / minor / major
-- 🔑 **Leaked secrets** — working tree *and* full git history scanned with [TruffleHog](https://github.com/trufflesecurity/trufflehog), including live verification of found credentials
+- 🔑 **Leaked secrets** — working tree _and_ full git history scanned with [TruffleHog](https://github.com/trufflesecurity/trufflehog), including live verification of found credentials
 
 > **Status: MVP.** Dependency/CVE tracking, version auditing, secret detection, GitHub import and the dashboard are implemented and covered by tests. Pre-1.0 — expect rough edges, and see the roadmap below for what's intentionally not here yet.
-
-## Screenshots
-
-![Sign-in screen](docs/screenshots/login.png)
-
-More screenshots (setup wizard, dashboard, project detail) are coming as the UI settles.
 
 ## Who is this for?
 
 Individual developers and small teams with **5–50 repositories**. The individual scanners already exist as excellent open-source tools, and enterprise aggregation platforms exist too — but they come with multiple services, role models, and heavyweight setup. LazySentry fills the gap in between: **one container, five minutes of setup**, and a dashboard you actually want to open.
 
-The value is not in custom scan engines — it's in orchestration, tracking findings over time, and a UI that answers three questions for every finding without a click: *What is this? How bad is it? What do I do now?*
+The value is not in custom scan engines — it's in orchestration, tracking findings over time, and a UI that answers three questions for every finding without a click: _What is this? How bad is it? What do I do now?_
 
 ## Key principles
 
