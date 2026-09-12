@@ -19,7 +19,8 @@ for (const envFile of ['.env', '../../.env']) {
 
 const envSchema = z.object({
   HOST: z.string().default('127.0.0.1'),
-  PORT: z.coerce.number().int().positive().default(3000),
+  // 3111, not 3000 — 3000 is the one port every other dev stack also grabs.
+  PORT: z.coerce.number().int().positive().default(3111),
   DATABASE_PATH: z.string().default('./data/lazysentry.db'),
   // Path to the osv-scanner binary. Defaults to the binary on PATH (the
   // Docker image copies it to /usr/local/bin); for local development point

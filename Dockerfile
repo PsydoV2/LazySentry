@@ -70,11 +70,11 @@ VOLUME /data
 ENV NODE_ENV=production \
     DATABASE_PATH=/data/lazysentry.db \
     HOST=0.0.0.0 \
-    PORT=3000
+    PORT=3111
 
 WORKDIR /app/api
 USER node
-EXPOSE 3000
+EXPOSE 3111
 
 ENTRYPOINT ["tini", "--"]
 # The worker service overrides this to `node dist/worker.js`

@@ -79,7 +79,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 docker compose up -d --build
 ```
 
-Open **http://127.0.0.1:3000** — you land in the setup wizard (create the
+Open **http://127.0.0.1:3111** — you land in the setup wizard (create the
 admin account, then connect GitHub with a personal access token scoped to
 `Contents: read` + `Metadata: read`). Full walkthrough, including exactly
 which GitHub token permissions to grant and how to read the dashboard once
@@ -98,7 +98,7 @@ Requires Node.js ≥ 22 and [pnpm](https://pnpm.io).
 ```sh
 pnpm install
 cp .env.example .env        # then fill in APP_ENCRYPTION_KEY (see comments in the file)
-pnpm dev                    # starts the API (127.0.0.1:3000), the scan worker and the web dev server
+pnpm dev                    # starts the API (127.0.0.1:3111), the scan worker and the web dev server
 ```
 
 Scans are executed by the **worker**, not by the API — a queued scan stays

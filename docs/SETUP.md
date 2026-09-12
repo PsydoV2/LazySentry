@@ -50,12 +50,12 @@ docker compose up -d --build
 
 This builds the image (a couple of minutes the first time, seconds after)
 and starts two containers on one shared database volume: `api` (the
-dashboard, on `http://127.0.0.1:3000`) and `worker` (runs scans, has no
+dashboard, on `http://127.0.0.1:3111`) and `worker` (runs scans, has no
 exposed port — see docs/CONCEPT.md 3.1). `docker compose logs -f` shows both.
 
 ## 3. First run: create the admin account
 
-Open **<http://127.0.0.1:3000>**. Since no admin account exists yet, you land
+Open **<http://127.0.0.1:3111>**. Since no admin account exists yet, you land
 directly in the setup wizard.
 
 **Step 1 — Create admin account.** Pick a username and password. This is the
