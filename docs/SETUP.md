@@ -2,8 +2,7 @@
 
 This walks through getting LazySentry running with Docker Compose — the
 supported way to run it — from a clean checkout to your first scanned
-repository. If something here doesn't match what you see, the full spec is
-in [`CONCEPT.md`](./CONCEPT.md).
+repository.
 
 ## Prerequisites
 
@@ -22,8 +21,8 @@ cp .env.example .env
 ```
 
 Open `.env` and generate a master encryption key — this is the one value
-that is not optional; the app refuses to start without it (docs/CONCEPT.md
-4.2), because it's what protects your stored GitHub token and settings:
+that is not optional; the app refuses to start without it, because it's
+what protects your stored GitHub token and settings:
 
 ```sh
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
@@ -51,7 +50,7 @@ docker compose up -d --build
 This builds the image (a couple of minutes the first time, seconds after)
 and starts two containers on one shared database volume: `api` (the
 dashboard, on `http://127.0.0.1:3111`) and `worker` (runs scans, has no
-exposed port — see docs/CONCEPT.md 3.1). `docker compose logs -f` shows both.
+exposed port). `docker compose logs -f` shows both.
 
 ## 3. First run: create the admin account
 
@@ -60,9 +59,9 @@ directly in the setup wizard.
 
 **Step 1 — Create admin account.** Pick a username and password. This is the
 _only_ way to create an account — there is no default password, no signup
-page, and this step locks itself once it's done (docs/CONCEPT.md 6.2).
-Whoever completes this step first owns the instance, so don't leave a
-freshly started, port-exposed instance sitting unclaimed.
+page, and this step locks itself once it's done. Whoever completes this
+step first owns the instance, so don't leave a freshly started,
+port-exposed instance sitting unclaimed.
 
 ## 4. Connect GitHub
 
@@ -99,16 +98,15 @@ same list your token can see, paginated and searchable) → **Import**. Each
 imported repository is queued for its first scan immediately, and its card
 appears right away in the `scanning` state.
 
-A first scan clones the full repository history (TruffleHog needs it — see
-docs/CONCEPT.md 5.1) and can take anywhere from a few seconds to several
-minutes depending on repository size. The card updates live over SSE; no
-need to refresh the page.
+A first scan clones the full repository history (TruffleHog needs it) and
+can take anywhere from a few seconds to several minutes depending on
+repository size. The card updates live; no need to refresh the page.
 
 ## Reading the results
 
-- **Card color is urgency, not severity** (docs/CONCEPT.md 8.1): a verified
-  secret always outranks even a critical CVE, because an active leaked
-  credential is exploitable _right now_. Red > orange > blue > green.
+- **Card color is urgency, not severity**: a verified secret always outranks
+  even a critical CVE, because an active leaked credential is exploitable
+  _right now_. Red > orange > blue > green.
 - A **verified** secret means TruffleHog confirmed the credential still
   works by testing it live against the provider's API. Removing the line
   from the code is not enough — the secret is still in git history and still
@@ -121,10 +119,10 @@ warnings`, not green.
 ## Turning off verification or secret scanning per project
 
 Live verification makes outbound requests from your server to third-party
-APIs (e.g. an AWS key gets tested with `GetCallerIdentity`) — see
-docs/CONCEPT.md 5.5. If that's not acceptable in your network, or you want
-to skip secret scanning on a given repository entirely, both are per-project
-toggles under a project's **Settings** tab.
+APIs (e.g. an AWS key gets tested with `GetCallerIdentity`). If that's not
+acceptable in your network, or you want to skip secret scanning on a given
+repository entirely, both are per-project toggles under a project's
+**Settings** tab.
 
 ## Updating
 
@@ -134,17 +132,15 @@ docker compose up -d --build
 ```
 
 Database migrations run automatically on `api` startup, against the
-existing volume — no manual migration step, no data loss (docs/CONCEPT.md
-3.3, 11).
+existing volume — no manual migration step, no data loss.
 
 ## Exposing this beyond localhost
 
-The published port is bound to `127.0.0.1` on purpose (docs/CONCEPT.md 6.2)
-— put a reverse proxy (Caddy, nginx, Traefik) in front of it and terminate
-TLS there. Once you do, set `HTTPS=true` in `.env` so session cookies get the
-`Secure` attribute, and set `APP_ORIGIN` to your public URL if the proxy
-rewrites the `Host` header (most don't need this — see the comment in
-`.env.example`).
+The published port is bound to `127.0.0.1` on purpose — put a reverse proxy
+(Caddy, nginx, Traefik) in front of it and terminate TLS there. Once you do,
+set `HTTPS=true` in `.env` so session cookies get the `Secure` attribute,
+and set `APP_ORIGIN` to your public URL if the proxy rewrites the `Host`
+header (most don't need this — see the comment in `.env.example`).
 
 ## Troubleshooting
 

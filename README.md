@@ -87,9 +87,9 @@ it's populated: **[docs/SETUP.md](docs/SETUP.md)**.
 
 `docker-compose.yml` runs two containers on one image and one shared SQLite
 volume — `api` (the dashboard) and `worker` (runs scans), both non-root with
-all capabilities dropped and a read-only root filesystem (docs/CONCEPT.md
-6.2). The published port is bound to `127.0.0.1`; put a reverse proxy in
-front to expose it beyond the host.
+all capabilities dropped and a read-only root filesystem. The published
+port is bound to `127.0.0.1`; put a reverse proxy in front to expose it
+beyond the host.
 
 ## Getting started (development)
 
@@ -103,10 +103,10 @@ pnpm dev                    # starts the API (127.0.0.1:3111), the scan worker a
 
 Scans are executed by the **worker**, not by the API — a queued scan stays
 queued until a worker is running. In development both run in one process
-(`node dist/main.js --with-worker`, see `docs/CONCEPT.md` 0.2), which is what
-`pnpm dev` starts. To run them separately, use `dev:api` and `dev:worker` in
-`apps/api`; production runs `node dist/api.js` and `node dist/worker.js` as
-two services on the same image.
+(`node dist/main.js --with-worker`), which is what `pnpm dev` starts. To run
+them separately, use `dev:api` and `dev:worker` in `apps/api`; production
+runs `node dist/api.js` and `node dist/worker.js` as two services on the
+same image.
 
 For local development the worker needs both scanner binaries. Download a
 pinned release of [osv-scanner](https://github.com/google/osv-scanner/releases)
