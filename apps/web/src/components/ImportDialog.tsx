@@ -3,6 +3,9 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { EmptyState } from './EmptyState';
+import { LoadingState } from './LoadingState';
+import { IconChevronLeft, IconChevronRight, IconGithub } from './icons';
 import { api, ApiError, type RepositoryPage } from '../lib/api';
 
 export function ImportDialog({ onClose }: { onClose: () => void }) {
@@ -63,7 +66,7 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="dialog-body">
-          {repositories.isLoading && <p className="muted">Loading…</p>}
+          {repositories.isLoading && <LoadingState />}
 
           {repositories.isError && (
             <p className="notice notice-error">
@@ -74,7 +77,7 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
           )}
 
           {repositories.data && repositories.data.repositories.length === 0 && (
-            <p className="muted">No repositories match this filter.</p>
+            <EmptyState icon={IconGithub} message="No repositories match this filter." />
           )}
 
           {repositories.data && repositories.data.repositories.length > 0 && (
@@ -108,38 +111,46 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
           )}
         </div>
 
-        <div className="dialog-footer">
-          <span className="subtle" style={{ marginRight: 'auto' }}>
-            {selected.size > 0 ? `${selected.size} selected` : ''}
-          </span>
+        <div className="dialog-footer dialog-footer-paginated">
           <button
             type="button"
-            className="btn-secondary"
+            className="btn-secondary btn-icon-only"
+            title="Previous page"
+            aria-label="Previous page"
             disabled={page === 1}
             onClick={() => setPage((current) => current - 1)}
           >
-            Previous
+            <IconChevronLeft />
           </button>
+
+          <div className="row" style={{ gap: 8 }}>
+            <span className="subtle">
+              {selected.size > 0 ? `${selected.size} selected` : ''}
+            </span>
+            <button type="button" className="btn-secondary" onClick={onClose}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={selected.size === 0 || importRepositories.isPending}
+              onClick={() => importRepositories.mutate()}
+            >
+              {importRepositories.isPending
+                ? 'Importing…'
+                : `Import${selected.size > 0 ? ` ${selected.size}` : ''}`}
+            </button>
+          </div>
+
           <button
             type="button"
-            className="btn-secondary"
+            className="btn-secondary btn-icon-only"
+            title="Next page"
+            aria-label="Next page"
             disabled={!repositories.data?.hasMore}
             onClick={() => setPage((current) => current + 1)}
           >
-            Next
-          </button>
-          <button type="button" className="btn-secondary" onClick={onClose}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="btn-primary"
-            disabled={selected.size === 0 || importRepositories.isPending}
-            onClick={() => importRepositories.mutate()}
-          >
-            {importRepositories.isPending
-              ? 'Importing…'
-              : `Import${selected.size > 0 ? ` ${selected.size}` : ''}`}
+            <IconChevronRight />
           </button>
         </div>
       </div>

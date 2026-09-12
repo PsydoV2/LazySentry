@@ -142,6 +142,56 @@
   box-sizing: border-box;
 }
 
+/* ---------- scrollbars ----------
+   Thin, floating thumb with no visible track — the macOS look, minus the
+   auto-hide-on-idle part CSS can't do on its own. Applies to the page
+   itself and any inner scroll container (.dialog-body, an overflowing
+   table) alike since it's keyed off the universal selector rather than one
+   specific element. Firefox gets the closest two-value equivalent. */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text-subtle) 55%, transparent) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  /* Border + content-box clip insets the visible thumb inside the track's
+     width, so it reads as a slim floating pill rather than a bar wedged
+     edge-to-edge. */
+  background-color: color-mix(in srgb, var(--text-subtle) 55%, transparent);
+  background-clip: content-box;
+  border: 3px solid transparent;
+  border-radius: 999px;
+  transition: background-color 0.15s;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--text-muted) 80%, transparent);
+}
+
+*::-webkit-scrollbar-thumb:active {
+  background-color: var(--text-muted);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -358,6 +408,17 @@ button:disabled {
   background: var(--bg);
 }
 
+/* Icon-only variant of a bordered button — pagination arrows and the like,
+   where the direction reads fine without a label but still needs to look
+   like a button among labeled ones (Cancel/Import) rather than the
+   borderless .icon-btn used for header chrome. */
+.btn-icon-only {
+  display: inline-flex;
+  align-items: center;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
 .btn-quiet {
   color: var(--text-muted);
   padding: 4px 8px;
@@ -443,6 +504,47 @@ button:disabled {
   background: var(--surface);
 }
 
+/* Lighter-weight than .empty-state above (no dashed box — a tab inside the
+   modal is already a bordered surface, it doesn't need a second one nested
+   in it): a neutral icon chip plus one line of text, for "nothing here yet"
+   inside a single tab. */
+.tab-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-7) var(--space-4);
+  text-align: center;
+}
+
+.tab-empty-state-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--border-strong);
+}
+
+.tab-empty-state-icon svg {
+  width: 132px;
+  height: 132px;
+  stroke-width: 1.2;
+}
+
+.tab-loading-spinner {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid var(--border);
+  border-top-color: var(--text-subtle);
+  animation: spin 0.8s linear infinite;
+}
+
+.tab-empty-state-text {
+  color: var(--text-subtle);
+  font-size: 12px;
+}
+
 /* ---------- dialog ---------- */
 
 .dialog-backdrop {
@@ -482,6 +584,13 @@ button:disabled {
   display: flex;
   justify-content: flex-end;
   gap: var(--space-2);
+}
+
+/* Pagination at the outer edges, the actual decision (Cancel/Import) stays
+   put in the middle — so paging through repositories never shifts the
+   buttons you're about to click. */
+.dialog-footer-paginated {
+  justify-content: space-between;
 }
 
 .dialog-body {

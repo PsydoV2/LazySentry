@@ -5,9 +5,10 @@
 
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { EmptyState } from './EmptyState';
 import { api, type Project, type Secret } from '../lib/api';
 import { formatDateTime, shortSha } from '../lib/format';
-import { IconCheck, IconKey, IconShieldAlert } from './icons';
+import { IconCheck, IconFolder, IconKey, IconShieldAlert, IconShieldCheck } from './icons';
 
 export function SecretsTab({ project }: { project: Project }) {
   const projectId = project.id;
@@ -32,13 +33,20 @@ export function SecretsTab({ project }: { project: Project }) {
   if (secrets.isLoading) return <p className="muted">Loading…</p>;
 
   if ((secrets.data ?? []).length === 0) {
-    const message =
-      project.lastScanId === null
-        ? 'This project has not been scanned yet.'
-        : !project.scanSecretsEnabled
-          ? 'Secret scanning is turned off for this project (see Settings).'
-          : 'No secrets found.';
-    return <p className="muted">{message}</p>;
+    if (project.lastScanId === null) {
+      return (
+        <EmptyState icon={IconFolder} message="This project has not been scanned yet." />
+      );
+    }
+    if (!project.scanSecretsEnabled) {
+      return (
+        <EmptyState
+          icon={IconKey}
+          message="Secret scanning is turned off for this project (see Settings)."
+        />
+      );
+    }
+    return <EmptyState icon={IconShieldCheck} message="No secrets found." />;
   }
 
   return (
@@ -68,11 +76,14 @@ export function SecretsTab({ project }: { project: Project }) {
       </div>
 
       {rows.length === 0 && (
-        <p className="muted">
-          {showResolved || resolvedCount === 0
-            ? 'Nothing to show.'
-            : `No open secrets. ${resolvedCount} resolved finding${resolvedCount === 1 ? '' : 's'} hidden — check "Show resolved findings".`}
-        </p>
+        <EmptyState
+          icon={IconShieldCheck}
+          message={
+            showResolved || resolvedCount === 0
+              ? 'Nothing to show.'
+              : `No open secrets. ${resolvedCount} resolved finding${resolvedCount === 1 ? '' : 's'} hidden — check "Show resolved findings".`
+          }
+        />
       )}
 
       {rows.length > 0 && (

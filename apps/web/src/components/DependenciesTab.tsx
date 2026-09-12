@@ -4,8 +4,9 @@
 
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { EmptyState } from './EmptyState';
 import { api, type PackageEntry, type Project, type Vulnerability } from '../lib/api';
-import { IconBug, IconChevronDown, IconPackage } from './icons';
+import { IconAlertTriangle, IconBug, IconChevronDown, IconFolder, IconPackage } from './icons';
 
 type SortKey = 'name' | 'ecosystem' | 'versionInstalled' | 'updateType';
 
@@ -93,13 +94,25 @@ export function DependenciesTab({ project }: { project: Project }) {
     // no finished scan to show — "no lockfiles" only when one actually ran
     // and looked (docs/CONCEPT.md 5.7: never claim a clean result for a scan
     // that never happened).
-    const message =
-      project.lastScanId === null
-        ? 'This project has not been scanned yet.'
-        : project.lastScanStatus === 'failed'
-          ? 'The last scan failed before dependencies could be scanned.'
-          : 'No supported lockfiles found — dependency scanning skipped.';
-    return <p className="muted">{message}</p>;
+    if (project.lastScanId === null) {
+      return (
+        <EmptyState icon={IconFolder} message="This project has not been scanned yet." />
+      );
+    }
+    if (project.lastScanStatus === 'failed') {
+      return (
+        <EmptyState
+          icon={IconAlertTriangle}
+          message="The last scan failed before dependencies could be scanned."
+        />
+      );
+    }
+    return (
+      <EmptyState
+        icon={IconPackage}
+        message="No supported lockfiles found — dependency scanning skipped."
+      />
+    );
   }
 
   const filtersActive = search !== '' || ecosystem !== '' || directOnly;
@@ -161,7 +174,7 @@ export function DependenciesTab({ project }: { project: Project }) {
       </div>
 
       {rows.length === 0 ? (
-        <p className="muted">No packages match these filters.</p>
+        <EmptyState icon={IconPackage} message="No packages match these filters." />
       ) : (
         <div className="list">
           <div className="data-table-header">
