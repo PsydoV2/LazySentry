@@ -51,10 +51,31 @@ export function urgencyRank(project: Project, state: CardState): number {
   return 6; // never_scanned
 }
 
+/**
+ * Sort rank ignores a transient 'queued'/'scanning' scanState on purpose —
+ * it ranks by the last *finished* result instead. Otherwise a card drops to
+ * the bottom the instant its scan starts and jumps back up when it ends,
+ * which reads as the grid randomly reshuffling itself while you watch. The
+ * card still shows "Scanning…" (via cardStateFor/urgencyRank, used for the
+ * glyph and color), it just doesn't change position until a new result
+ * actually lands.
+ */
+function stableSortRank(project: Project): number {
+  if (project.lastScanId === null) return 6; // never scanned — no result yet
+  if (project.lastScanStatus === 'failed' || project.lastScanStatus === 'cancelled') {
+    return 4;
+  }
+  return urgencyRank(
+    project,
+    project.lastScanStatus === 'completed_with_warnings'
+      ? 'completed_with_warnings'
+      : 'completed',
+  );
+}
+
 export function sortByUrgency(projects: Project[]): Project[] {
   return [...projects].sort((a, b) => {
-    const rankDiff =
-      urgencyRank(a, cardStateFor(a)) - urgencyRank(b, cardStateFor(b));
+    const rankDiff = stableSortRank(a) - stableSortRank(b);
     if (rankDiff !== 0) return rankDiff;
     return (b.lastScanAt ?? 0) - (a.lastScanAt ?? 0);
   });

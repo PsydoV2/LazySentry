@@ -360,26 +360,55 @@ button:disabled {
 }
 
 .dialog-body {
+  flex: 1;
+  min-height: 0;
   padding: var(--space-4) var(--space-5);
   overflow-y: auto;
 }
 
+/* ---------- fixed-size modal (project detail & settings) ----------
+   Opens centered over the dashboard instead of navigating to a new page —
+   same dimmed backdrop as the import dialog, but a constant footprint that
+   doesn't resize as you switch tabs or as content loads in. */
+
+.dialog-fixed {
+  width: min(760px, calc(100vw - 32px));
+  height: min(640px, calc(100vh - 64px));
+  max-width: none;
+  max-height: none;
+}
+
+.modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.modal-tabs {
+  padding: 0 var(--space-5);
+  flex-shrink: 0;
+}
+
 /* ---------- project grid & cards (8.1) ----------
-   Portrait 9:16 tiles: a status glyph carries the at-a-glance read, pills
-   carry the breakdown, and cards keep a sane width instead of stretching to
-   fill the row (which an aspect-ratio tile would turn into extra height). */
+   Landscape tiles: a status glyph + headline sit on one line with the pills
+   trailing after them, so the card reads left-to-right instead of stacking
+   everything in a tall centered column. Width comes from the content, not
+   from a fixed aspect-ratio — the card only grows taller than its minimum
+   when a project has enough pills to wrap onto a second line. */
 
 .project-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 270px));
+  grid-template-columns: repeat(auto-fill, minmax(320px, 420px));
   justify-content: start;
   gap: var(--space-4);
 }
 
 .project-card {
-  /* Portrait, but not phone-narrow — wide enough for the pills to sit
-     comfortably next to each other instead of stacking one per line. */
-  aspect-ratio: 3 / 4;
+  min-height: 108px;
   text-align: left;
   display: flex;
   flex-direction: column;
@@ -389,7 +418,6 @@ button:disabled {
   padding: var(--space-4);
   cursor: pointer;
   transition: border-color 0.15s;
-  overflow: hidden;
 }
 
 .project-card:hover {
@@ -447,30 +475,33 @@ button:disabled {
 .project-card-body {
   flex: 1;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
-  gap: var(--space-4);
+  gap: var(--space-3);
   padding: var(--space-3) 0;
-  text-align: center;
+  text-align: left;
   min-height: 0;
 }
 
 .project-card-glyph {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   gap: var(--space-2);
+  flex-shrink: 0;
 }
 
 .glyph-icon {
-  width: 32px;
-  height: 32px;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
 }
 
 .glyph-spinner {
-  width: 26px;
-  height: 26px;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
   border-radius: 50%;
   border: 3px solid var(--border);
   border-top-color: var(--text-subtle);
@@ -481,14 +512,17 @@ button:disabled {
   font-size: 12.5px;
   font-weight: 600;
   line-height: 1.3;
-  max-width: 15ch;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
 }
 
 .project-card-pills {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 5px;
 }
 
@@ -651,12 +685,6 @@ button:disabled {
 }
 
 /* ---------- detail view ---------- */
-
-.detail-header {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
 
 .tabs {
   display: flex;

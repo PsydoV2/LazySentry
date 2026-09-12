@@ -74,36 +74,29 @@ export function App() {
     <UserMenu user={session.data} navigate={navigate} onSignedOut={invalidateAll} />
   );
 
-  if (route.name === 'project') {
-    return (
-      <>
-        {userMenu}
-        {/* Keyed on the id so navigating from one project straight to
-            another remounts the view — otherwise the active tab (and each
-            tab's own filter state) would carry over from the previous
-            project. */}
-        <ProjectDetail
-          key={route.id}
-          projectId={route.id}
-          onBack={() => navigate({ name: 'dashboard' })}
-        />
-      </>
-    );
-  }
-
-  if (route.name === 'settings') {
-    return (
-      <>
-        {userMenu}
-        <Settings onBack={() => navigate({ name: 'dashboard' })} />
-      </>
-    );
-  }
-
+  // Project detail and settings open as a centered modal over the dashboard
+  // rather than replacing it — the dashboard (and its SSE-driven state)
+  // stays mounted underneath, and closing the modal is instant instead of a
+  // refetch. The route still changes underneath the modal, so deep links,
+  // reload and the browser back button keep working.
   return (
     <>
       {userMenu}
       <Dashboard navigate={navigate} />
+      {route.name === 'project' && (
+        // Keyed on the id so navigating from one project straight to
+        // another remounts the view — otherwise the active tab (and each
+        // tab's own filter state) would carry over from the previous
+        // project.
+        <ProjectDetail
+          key={route.id}
+          projectId={route.id}
+          onClose={() => navigate({ name: 'dashboard' })}
+        />
+      )}
+      {route.name === 'settings' && (
+        <Settings onClose={() => navigate({ name: 'dashboard' })} />
+      )}
     </>
   );
 }
