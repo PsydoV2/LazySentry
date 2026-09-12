@@ -5,6 +5,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api, type PackageEntry, type Project, type Vulnerability } from '../lib/api';
+import { IconBug, IconChevronDown, IconPackage } from './icons';
 
 type SortKey = 'name' | 'ecosystem' | 'versionInstalled' | 'updateType';
 
@@ -101,9 +102,15 @@ export function DependenciesTab({ project }: { project: Project }) {
     return <p className="muted">{message}</p>;
   }
 
+  const filtersActive = search !== '' || ecosystem !== '' || directOnly;
+  const directCount = (packages.data ?? []).filter((pkg) => pkg.isDirect).length;
+  const outdatedCount = (packages.data ?? []).filter(
+    (pkg) => pkg.updateType !== 'none' && pkg.updateType !== 'unknown',
+  ).length;
+
   return (
     <div className="stack">
-      <div className="row">
+      <div className="filter-bar">
         <input
           type="search"
           placeholder="Filter by package name…"
@@ -127,97 +134,138 @@ export function DependenciesTab({ project }: { project: Project }) {
           />
           Direct only
         </label>
+        {filtersActive && (
+          <button
+            type="button"
+            className="btn-quiet"
+            onClick={() => {
+              setSearch('');
+              setEcosystem('');
+              setDirectOnly(false);
+            }}
+          >
+            Clear filters
+          </button>
+        )}
       </div>
 
-      <div className="list">
-        <div className="data-table-header">
-          <SortableHeader label="Package" active={sortKey === 'name'} onClick={() => setSortKey('name')} />
-          <SortableHeader
-            label="Ecosystem"
-            active={sortKey === 'ecosystem'}
-            onClick={() => setSortKey('ecosystem')}
-          />
-          <span>Installed</span>
-          <span>Latest</span>
-          <SortableHeader
-            label="Update"
-            active={sortKey === 'updateType'}
-            onClick={() => setSortKey('updateType')}
-          />
-          <span>Vulnerabilities</span>
-        </div>
+      <div className="table-summary subtle">
+        <span>
+          {filtersActive
+            ? `${rows.length} of ${packages.data?.length ?? 0} packages`
+            : `${packages.data?.length ?? 0} packages`}
+          {' · '}
+          {directCount} direct
+          {outdatedCount > 0 ? ` · ${outdatedCount} need updates` : ''}
+        </span>
+      </div>
 
-        {rows.map((pkg) => {
-          const key = `${pkg.ecosystem}::${pkg.name}`;
-          const vulns = vulnsByPackage.get(key) ?? [];
-          const isExpanded = expanded === pkg.id;
-          return (
-            <div key={pkg.id}>
-              <button
-                type="button"
-                className="data-table-row"
-                onClick={() => setExpanded(isExpanded ? null : pkg.id)}
-                disabled={vulns.length === 0}
-              >
-                <span>
-                  {pkg.name}
-                  {!pkg.isDirect && <span className="subtle"> · transitive</span>}
-                  {pkg.sourceFile && <span className="subtle"> · {pkg.sourceFile}</span>}
-                </span>
-                <span className="subtle">{pkg.ecosystem}</span>
-                <span className="mono">{pkg.versionInstalled}</span>
-                <span className="mono">{pkg.versionLatest ?? '—'}</span>
-                <span>
-                  <span className={`pill ${UPDATE_PILL[pkg.updateType]}`}>
-                    {UPDATE_LABEL[pkg.updateType]}
-                  </span>
-                </span>
-                <span>
-                  {vulns.length > 0 ? (
-                    <span className={`pill ${SEVERITY_PILL[highestSeverity(vulns)]}`}>
-                      {vulns.length} CVE{vulns.length === 1 ? '' : 's'}
+      {rows.length === 0 ? (
+        <p className="muted">No packages match these filters.</p>
+      ) : (
+        <div className="list">
+          <div className="data-table-header">
+            <SortableHeader label="Package" active={sortKey === 'name'} onClick={() => setSortKey('name')} />
+            <SortableHeader
+              label="Ecosystem"
+              active={sortKey === 'ecosystem'}
+              onClick={() => setSortKey('ecosystem')}
+            />
+            <span>Installed</span>
+            <span>Latest</span>
+            <SortableHeader
+              label="Update"
+              active={sortKey === 'updateType'}
+              onClick={() => setSortKey('updateType')}
+            />
+            <span>Vulnerabilities</span>
+          </div>
+
+          {rows.map((pkg) => {
+            const key = `${pkg.ecosystem}::${pkg.name}`;
+            const vulns = vulnsByPackage.get(key) ?? [];
+            const isExpanded = expanded === pkg.id;
+            return (
+              <div key={pkg.id}>
+                <button
+                  type="button"
+                  className="data-table-row"
+                  onClick={() => setExpanded(isExpanded ? null : pkg.id)}
+                  disabled={vulns.length === 0}
+                >
+                  <span className="table-cell-stack">
+                    <span className="table-cell-title">
+                      <span title={pkg.name}>{pkg.name}</span>
+                      {!pkg.isDirect && <span className="pill pill-neutral">transitive</span>}
                     </span>
-                  ) : (
-                    <span className="subtle">none</span>
-                  )}
-                </span>
-              </button>
-
-              {isExpanded && vulns.length > 0 && (
-                <div className="vuln-details stack">
-                  {vulns.map((vuln) => (
-                    <div key={vuln.id} className="vuln-detail-row">
-                      <span className={`pill ${SEVERITY_PILL[vuln.severity]}`}>
-                        {vuln.severity}
+                    {pkg.sourceFile && (
+                      <span className="table-cell-path subtle" title={pkg.sourceFile}>
+                        {pkg.sourceFile}
                       </span>
-                      <div className="stack" style={{ gap: 2, flex: 1 }}>
-                        <span>
-                          <a
-                            href={`https://osv.dev/vulnerability/${encodeURIComponent(vuln.osvId)}`}
-                            target="_blank"
-                            rel="noreferrer noopener"
-                          >
-                            {vuln.osvId}
-                          </a>
-                          {vuln.aliases.length > 0 && (
-                            <span className="subtle"> · {vuln.aliases.join(', ')}</span>
-                          )}
+                    )}
+                  </span>
+                  <span className="subtle">{pkg.ecosystem}</span>
+                  <span className="mono">{pkg.versionInstalled}</span>
+                  <span className="mono">{pkg.versionLatest ?? '—'}</span>
+                  <span>
+                    <span className={`pill ${UPDATE_PILL[pkg.updateType]}`}>
+                      <IconPackage className="pill-icon" />
+                      {UPDATE_LABEL[pkg.updateType]}
+                    </span>
+                  </span>
+                  <span className="row" style={{ gap: 6 }}>
+                    {vulns.length > 0 ? (
+                      <>
+                        <span className={`pill ${SEVERITY_PILL[highestSeverity(vulns)]}`}>
+                          <IconBug className="pill-icon" />
+                          {vulns.length} CVE{vulns.length === 1 ? '' : 's'}
                         </span>
-                        {vuln.summary && <span className="muted">{vuln.summary}</span>}
-                        <span className="subtle">
-                          {vuln.fixedVersion
-                            ? `Fixed in ${vuln.fixedVersion}`
-                            : 'No fixed version published yet'}
+                        <IconChevronDown
+                          className={`row-chevron ${isExpanded ? 'is-expanded' : ''}`}
+                        />
+                      </>
+                    ) : (
+                      <span className="subtle">none</span>
+                    )}
+                  </span>
+                </button>
+
+                {isExpanded && vulns.length > 0 && (
+                  <div className="vuln-details stack">
+                    {vulns.map((vuln) => (
+                      <div key={vuln.id} className="vuln-detail-row">
+                        <span className={`pill ${SEVERITY_PILL[vuln.severity]}`}>
+                          {vuln.severity}
                         </span>
+                        <div className="stack" style={{ gap: 2, flex: 1 }}>
+                          <span>
+                            <a
+                              href={`https://osv.dev/vulnerability/${encodeURIComponent(vuln.osvId)}`}
+                              target="_blank"
+                              rel="noreferrer noopener"
+                            >
+                              {vuln.osvId}
+                            </a>
+                            {vuln.aliases.length > 0 && (
+                              <span className="subtle"> · {vuln.aliases.join(', ')}</span>
+                            )}
+                          </span>
+                          {vuln.summary && <span className="muted">{vuln.summary}</span>}
+                          <span className="subtle">
+                            {vuln.fixedVersion
+                              ? `Fixed in ${vuln.fixedVersion}`
+                              : 'No fixed version published yet'}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

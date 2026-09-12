@@ -179,7 +179,8 @@ label {
 
 input[type="text"],
 input[type="password"],
-input[type="search"] {
+input[type="search"],
+select {
   width: 100%;
   padding: 8px 10px;
   border: 1px solid var(--border-strong);
@@ -187,6 +188,18 @@ input[type="search"] {
   background: var(--surface);
   color: var(--text);
   font: inherit;
+}
+
+/* Native <select> arrows otherwise render in the OS theme, which is the one
+   place this app would suddenly stop looking like itself. */
+select {
+  width: auto;
+  appearance: none;
+  padding-right: 30px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23908e89' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 16px;
 }
 
 input:focus-visible,
@@ -669,6 +682,66 @@ button:disabled {
   color: var(--text);
   border-bottom-color: var(--accent);
   font-weight: 500;
+}
+
+/* ---------- tab toolbars (dependencies & secrets) ----------
+   Shared by both data-heavy tabs: a filter row that wraps at phone width
+   instead of overflowing, plus a result-count line so "12 of 340 shown"
+   reads the same way the dashboard header reads "8 projects". */
+
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.filter-bar select {
+  width: auto;
+}
+
+.table-summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.table-cell-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.table-cell-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.table-cell-title > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.table-cell-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row-chevron {
+  color: var(--text-subtle);
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+
+.row-chevron.is-expanded {
+  transform: rotate(180deg);
 }
 
 /* ---------- dependency table ---------- */
