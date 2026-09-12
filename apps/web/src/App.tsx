@@ -91,6 +91,7 @@ export function App() {
         <ProjectDetail
           key={route.id}
           projectId={route.id}
+          initialTab={route.tab}
           onClose={() => navigate({ name: 'dashboard' })}
         />
       )}

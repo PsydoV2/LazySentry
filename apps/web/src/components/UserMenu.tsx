@@ -6,7 +6,14 @@ import { useEffect, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { api, type CurrentUser } from '../lib/api';
 import type { Route } from '../lib/router';
-import { IconLogOut, IconSettings, IconUser } from './icons';
+import { type Theme, useTheme } from '../lib/theme';
+import { IconLogOut, IconMonitor, IconMoon, IconSettings, IconSun, IconUser } from './icons';
+
+const THEME_OPTIONS: { value: Theme; label: string; icon: typeof IconSun }[] = [
+  { value: 'system', label: 'Match system theme', icon: IconMonitor },
+  { value: 'light', label: 'Light theme', icon: IconSun },
+  { value: 'dark', label: 'Dark theme', icon: IconMoon },
+];
 
 export function UserMenu({
   user,
@@ -19,6 +26,7 @@ export function UserMenu({
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const [theme, setTheme] = useTheme();
 
   useEffect(() => {
     if (!open) return;
@@ -60,6 +68,27 @@ export function UserMenu({
         <div className="user-menu-dropdown" role="menu">
           <div className="user-menu-name">{user.username}</div>
           <hr className="divider" style={{ margin: '6px 0' }} />
+
+          <div className="user-menu-theme">
+            <span className="user-menu-theme-label">Theme</span>
+            <div className="theme-toggle" role="group" aria-label="Theme">
+              {THEME_OPTIONS.map(({ value, label, icon: Icon }) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={`theme-toggle-btn ${theme === value ? 'is-active' : ''}`}
+                  title={label}
+                  aria-label={label}
+                  aria-pressed={theme === value}
+                  onClick={() => setTheme(value)}
+                >
+                  <Icon />
+                </button>
+              ))}
+            </div>
+          </div>
+          <hr className="divider" style={{ margin: '6px 0' }} />
+
           <button
             type="button"
             role="menuitem"

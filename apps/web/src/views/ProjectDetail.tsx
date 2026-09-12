@@ -12,11 +12,9 @@ import { SecretsTab } from '../components/SecretsTab';
 import { SettingsTab } from '../components/SettingsTab';
 import { api, ApiError, type Project } from '../lib/api';
 import { useScanEvents } from '../lib/events';
+import { PROJECT_TABS, type ProjectTab } from '../lib/router';
 
-const TABS = ['overview', 'dependencies', 'secrets', 'settings'] as const;
-type Tab = (typeof TABS)[number];
-
-const TAB_LABEL: Record<Tab, string> = {
+const TAB_LABEL: Record<ProjectTab, string> = {
   overview: 'Overview',
   dependencies: 'Dependencies',
   secrets: 'Secrets',
@@ -25,12 +23,14 @@ const TAB_LABEL: Record<Tab, string> = {
 
 export function ProjectDetail({
   projectId,
+  initialTab,
   onClose,
 }: {
   projectId: number;
+  initialTab?: ProjectTab;
   onClose: () => void;
 }) {
-  const [tab, setTab] = useState<Tab>('overview');
+  const [tab, setTab] = useState<ProjectTab>(initialTab ?? 'overview');
 
   // Scan progress arrives over SSE here too — an open detail modal must
   // reflect a running scan without a manual refresh (3.5).
@@ -68,7 +68,7 @@ export function ProjectDetail({
       onClose={onClose}
       tabs={
         <div className="tabs">
-          {TABS.map((value) => (
+          {PROJECT_TABS.map((value) => (
             <button
               key={value}
               type="button"

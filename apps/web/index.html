@@ -4,6 +4,23 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>LazySentry</title>
+    <script>
+      // Applies a saved explicit theme choice before first paint, so the
+      // page never flashes the wrong theme for a split second while React
+      // boots. No stored value (or 'system') means the CSS media query
+      // decides — see styles.css and lib/theme.ts.
+      (function () {
+        try {
+          var stored = localStorage.getItem('lazysentry-theme');
+          if (stored === 'light' || stored === 'dark') {
+            document.documentElement.setAttribute('data-theme', stored);
+          }
+        } catch (error) {
+          // Storage can throw in a locked-down environment — the media
+          // query default still applies.
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

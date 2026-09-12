@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ImportDialog } from '../components/ImportDialog';
 import { ProjectCard } from '../components/ProjectCard';
+import { IconPlus } from '../components/icons';
 import { api, type Project } from '../lib/api';
 import { sortByUrgency } from '../lib/card-state';
 import { useScanEvents } from '../lib/events';
@@ -61,9 +62,10 @@ export function Dashboard({
         </div>
         <button
           type="button"
-          className="btn-primary"
+          className="btn-text-icon"
           onClick={() => setImporting(true)}
         >
+          <IconPlus />
           Import project
         </button>
       </div>
@@ -93,6 +95,9 @@ export function Dashboard({
               key={project.id}
               project={project}
               onOpen={() => navigate({ name: 'project', id: project.id })}
+              onOpenSettings={() =>
+                navigate({ name: 'project', id: project.id, tab: 'settings' })
+              }
               onScanNow={() => triggerScan.mutate(project.id)}
               onCancelScan={() => cancelScan.mutate(project.id)}
               scanDisabled={triggerScan.isPending}

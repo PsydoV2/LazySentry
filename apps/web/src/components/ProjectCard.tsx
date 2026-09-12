@@ -16,8 +16,10 @@ import {
   IconGithub,
   IconKey,
   IconLock,
+  IconMoreHorizontal,
   IconPackage,
   IconPlay,
+  IconSettings,
   IconShieldAlert,
   IconShieldCheck,
   IconStop,
@@ -42,12 +44,14 @@ function ownerOf(fullName: string): string {
 export function ProjectCard({
   project,
   onOpen,
+  onOpenSettings,
   onScanNow,
   onCancelScan,
   scanDisabled,
 }: {
   project: Project;
   onOpen: () => void;
+  onOpenSettings: () => void;
   onScanNow: () => void;
   onCancelScan: () => void;
   scanDisabled: boolean;
@@ -79,19 +83,45 @@ export function ProjectCard({
           </span>
         </div>
 
-        <ScanControl
-          projectName={project.name}
-          isBusy={isBusy}
-          disabled={scanDisabled}
-          onScan={(event) => {
-            event.stopPropagation();
-            onScanNow();
-          }}
-          onCancel={(event) => {
-            event.stopPropagation();
-            onCancelScan();
-          }}
-        />
+        <div className="project-card-actions">
+          <ScanControl
+            projectName={project.name}
+            isBusy={isBusy}
+            disabled={scanDisabled}
+            onScan={(event) => {
+              event.stopPropagation();
+              onScanNow();
+            }}
+            onCancel={(event) => {
+              event.stopPropagation();
+              onCancelScan();
+            }}
+          />
+          <button
+            type="button"
+            className="card-icon-btn"
+            title="Project settings"
+            aria-label={`Open settings for ${project.name}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpenSettings();
+            }}
+          >
+            <IconSettings />
+          </button>
+          <button
+            type="button"
+            className="card-icon-btn"
+            title="Open project"
+            aria-label={`Open ${project.name}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpen();
+            }}
+          >
+            <IconMoreHorizontal />
+          </button>
+        </div>
       </div>
 
       <div className="project-card-body">

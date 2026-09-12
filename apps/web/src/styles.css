@@ -1,27 +1,51 @@
 /* Design system per docs/CONCEPT.md 8.0: near-neutral palette, generous
    whitespace, thin borders instead of shadows, one restrained accent.
    Saturated colors are reserved for severity and status signals — if color
-   is everywhere it stops meaning anything. */
+   is everywhere it stops meaning anything.
+
+   Theme: light is the default palette on bare :root. Dark is defined twice
+   on purpose — once under the OS media query (for 'system', no explicit
+   choice) and once under [data-theme="dark"] (an explicit choice, which
+   must win regardless of the OS setting). Toggle lives in lib/theme.ts +
+   UserMenu; see index.html for the pre-paint script that avoids a flash of
+   the wrong theme. */
 
 :root {
-  --bg: #fbfbfb; /* Komplett cleanes, helles Off-White */
+  /* bg vs. surface is the card/page contrast — kept a visible step apart
+     (not just a couple of luminance points) so a card actually reads as a
+     raised surface instead of blending into the page. */
+  --bg: #eeece9; /* Off-white canvas, visibly deeper than the cards on it */
   --surface: #ffffff; /* Schneeweiß für Karten und Boxen */
-  --border: #f1f1f0; /* Extrem dezente Notion-Border für Tabellen/Linien */
-  --border-strong: #e1e1e0; /* Für fokussierte Inputs oder Trennlinien */
+  --border: #e2e0da; /* Dezente Notion-Border für Tabellen/Linien */
+  --border-strong: #cac7bd; /* Für fokussierte Inputs oder Trennlinien */
 
   --text: #1a1a1a; /* Airbnb-Standard für maximal lesbaren Text */
   --text-muted: #5f5e5b; /* Für sekundäre Texte und Beschreibungen */
-  --text-subtle: #908e89; /* Für Datumsangaben oder Tabellen-Header */
+  --text-subtle: #8b8983; /* Für Datumsangaben oder Tabellen-Header */
 
   --accent: #7c3aed; /* Kraftvolles, cleanes Violett */
   --accent-hover: #6d28d9; /* Dunkleres Violett für Hover-Effekte */
-  --accent-subtle: #f5f3ff; /* Sehr softes Violett-Weiß */
+  --accent-subtle: #f2eeff; /* Sehr softes Violett-Weiß */
 
   --signal-critical: #df2c2c; /* Strahlendes, gefährliches Rot */
   --signal-high: #f59e0b; /* Klares, warnendes Orange */
   --signal-medium: #eab308; /* Reines Gelb für mittlere Warnungen */
   --signal-info: #0284c7; /* Ein helles, klares Info-Blau (getrennt vom Core-Accent!) */
   --signal-ok: #10b981; /* Frisches, beruhigendes SaaS-Grün */
+  --pill-medium-text: #8a6212; /* Legible text on the translucent yellow pill */
+
+  --danger-border: #e6c9c4;
+  --danger-bg: #fdf5f4;
+  --danger-bg-hover: #fbe8e6;
+  --danger-text: #8f2e22;
+  --warning-border: #ecd9b0;
+  --warning-bg: #fdf9ef;
+  --warning-text: #8a6212;
+  --info-border: #cddced;
+  --info-text: #2c5580;
+
+  --shadow-float: 0 8px 28px rgb(32 30 28 / 12%);
+  --backdrop: rgb(32 30 28 / 32%);
 
   --radius: 6px;
   --radius-lg: 8px;
@@ -40,6 +64,78 @@
   --font-mono:
     ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
     monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #16161a;
+    --surface: #1f1f24;
+    --border: #2b2b31;
+    --border-strong: #40404a;
+
+    --text: #f1f0ed;
+    --text-muted: #ada9a2;
+    --text-subtle: #7d7a74;
+
+    --accent: #8b5cf6;
+    --accent-hover: #9d78ff;
+    --accent-subtle: #261e3d;
+
+    --signal-critical: #ff6b6b;
+    --signal-high: #ffb648;
+    --signal-medium: #f0ce4e;
+    --signal-info: #4fc3fb;
+    --signal-ok: #3ddc97;
+    --pill-medium-text: #ffe8a3;
+
+    --danger-border: #6b2f2b;
+    --danger-bg: #2a1514;
+    --danger-bg-hover: #341a19;
+    --danger-text: #ff9e91;
+    --warning-border: #5c4a1f;
+    --warning-bg: #241f0d;
+    --warning-text: #f3d478;
+    --info-border: #2c4a63;
+    --info-text: #7fd0ff;
+
+    --shadow-float: 0 8px 28px rgb(0 0 0 / 45%);
+    --backdrop: rgb(0 0 0 / 55%);
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #16161a;
+  --surface: #1f1f24;
+  --border: #2b2b31;
+  --border-strong: #40404a;
+
+  --text: #f1f0ed;
+  --text-muted: #ada9a2;
+  --text-subtle: #7d7a74;
+
+  --accent: #8b5cf6;
+  --accent-hover: #9d78ff;
+  --accent-subtle: #261e3d;
+
+  --signal-critical: #ff6b6b;
+  --signal-high: #ffb648;
+  --signal-medium: #f0ce4e;
+  --signal-info: #4fc3fb;
+  --signal-ok: #3ddc97;
+  --pill-medium-text: #ffe8a3;
+
+  --danger-border: #6b2f2b;
+  --danger-bg: #2a1514;
+  --danger-bg-hover: #341a19;
+  --danger-text: #ff9e91;
+  --warning-border: #5c4a1f;
+  --warning-bg: #241f0d;
+  --warning-text: #f3d478;
+  --info-border: #2c4a63;
+  --info-text: #7fd0ff;
+
+  --shadow-float: 0 8px 28px rgb(0 0 0 / 45%);
+  --backdrop: rgb(0 0 0 / 55%);
 }
 
 * {
@@ -196,10 +292,24 @@ select {
   width: auto;
   appearance: none;
   padding-right: 30px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23908e89' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238b8983' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 8px center;
   background-size: 16px;
+}
+
+/* The chevron above is a data: URI with the stroke color baked in, so it
+   can't follow --text-subtle automatically like everything else — it needs
+   its own dark-mode copy in the same light-stroke tone as dark's
+   --text-subtle. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237d7a74' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  }
+}
+
+:root[data-theme="dark"] select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237d7a74' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
 
 input:focus-visible,
@@ -257,6 +367,21 @@ button:disabled {
   background: var(--bg);
 }
 
+/* Bold text + icon, no button chrome — for the one action that sits in a
+   fixed spot in the page header rather than competing for attention as a
+   filled button. */
+.btn-text-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  color: var(--text);
+  font-weight: 600;
+}
+.btn-text-icon:hover:not(:disabled) {
+  background: var(--bg);
+}
+
 /* ---------- messages ---------- */
 
 .notice {
@@ -267,21 +392,21 @@ button:disabled {
 }
 
 .notice-error {
-  border-color: #e6c9c4;
-  background: #fdf5f4;
-  color: #8f2e22;
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger-text);
 }
 
 .notice-warning {
-  border-color: #ecd9b0;
-  background: #fdf9ef;
-  color: #8a6212;
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+  color: var(--warning-text);
 }
 
 .notice-info {
-  border-color: #cddced;
+  border-color: var(--info-border);
   background: var(--accent-subtle);
-  color: #2c5580;
+  color: var(--info-text);
 }
 
 /* ---------- lists ---------- */
@@ -323,7 +448,7 @@ button:disabled {
 .dialog-backdrop {
   position: fixed;
   inset: 0;
-  background: rgb(32 30 28 / 32%);
+  background: var(--backdrop);
   display: grid;
   place-items: center;
   padding: var(--space-5);
@@ -340,7 +465,7 @@ button:disabled {
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
   /* The one place a shadow is warranted: a layer floating above the page. */
-  box-shadow: 0 8px 28px rgb(32 30 28 / 12%);
+  box-shadow: var(--shadow-float);
 }
 
 .dialog-header,
@@ -570,6 +695,35 @@ button:disabled {
   color: var(--text);
 }
 
+/* Top-right action group: settings shortcut and overflow menu sit next to
+   the scan control, same 28px circular footprint but neutral (they aren't
+   the primary action) instead of the scan button's status color. */
+
+.project-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.card-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--text-subtle);
+  background: transparent;
+}
+
+.card-icon-btn:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--bg);
+}
+
 /* Top-right scan control: a green "run" button that turns into a spinner
    while a scan is queued/running, which itself turns into a stop button on
    hover — same interaction Jenkins uses for its build spinners. */
@@ -663,9 +817,10 @@ button:disabled {
 }
 
 .pill-medium {
-  /* Plain yellow text stays illegible no matter the trend — darkened a step
+  /* Plain yellow text stays illegible no matter the theme — --pill-medium-text
+     shifts to a dark amber on light backgrounds and a pale one on dark,
      while the background keeps the same translucent-yellow treatment. */
-  color: #8a6212;
+  color: var(--pill-medium-text);
   background: color-mix(in srgb, var(--signal-medium) 45%, transparent);
 }
 
@@ -909,13 +1064,13 @@ button:disabled {
 }
 
 .btn-danger {
-  border-color: #e6c9c4;
-  background: #fdf5f4;
-  color: #8f2e22;
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger-text);
 }
 
 .btn-danger:hover:not(:disabled) {
-  background: #fbe8e6;
+  background: var(--danger-bg-hover);
 }
 
 /* ---------- steps ---------- */
@@ -981,7 +1136,7 @@ button:disabled {
   background: var(--surface);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
-  box-shadow: 0 8px 24px rgb(32 30 28 / 12%);
+  box-shadow: var(--shadow-float);
   z-index: 6;
 }
 
@@ -992,6 +1147,50 @@ button:disabled {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.user-menu-theme {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+}
+
+.user-menu-theme-label {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.theme-toggle {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.theme-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: calc(var(--radius) - 2px);
+  color: var(--text-subtle);
+  background: transparent;
+}
+
+.theme-toggle-btn:hover:not(.is-active) {
+  color: var(--text);
+}
+
+.theme-toggle-btn.is-active {
+  background: var(--surface);
+  color: var(--accent);
 }
 
 .user-menu-item {
@@ -1013,6 +1212,6 @@ button:disabled {
 }
 
 .user-menu-item-danger:hover:not(:disabled) {
-  color: #8f2e22;
-  background: #fdf5f4;
+  color: var(--danger-text);
+  background: var(--danger-bg);
 }
