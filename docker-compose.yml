@@ -1,0 +1,94 @@
+# Production setup (docs/CONCEPT.md 0.2, 3.1): one image, two services —
+# `api` serves the dashboard, `worker` runs the scan queue — sharing one
+# SQLite volume. There is no coupling between them beyond that file: the
+# worker polls the database directly, it does not talk to the api process.
+#
+# Quickstart:
+#   cp .env.example .env   # then fill in APP_ENCRYPTION_KEY
+#   docker compose up -d --build
+#   open http://127.0.0.1:3000
+#
+# IMPORTANT: don't reuse a `.env` you already use for local `pnpm dev` as-is.
+# A dev .env typically pins DATABASE_PATH / OSV_SCANNER_PATH / TRUFFLEHOG_PATH
+# to host paths (e.g. a Windows path to tools/osv-scanner.exe) so the app can
+# find binaries and a database file outside a container. Those three would be
+# meaningless — or actively break things — inside this image, which is why
+# they're pinned to the right in-container values below instead of coming
+# from .env. Only put APP_ENCRYPTION_KEY (required) and, if you need them,
+# HTTPS / APP_ORIGIN into the .env used here.
+
+services:
+  api:
+    build: .
+    image: lazysentry:local
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Reachable on the container's own interface; what's actually reachable
+      # from the host is decided by the port publish below, not this value
+      # (docs/CONCEPT.md 6.2 — bind to loopback by default, expose deliberately).
+      HOST: 0.0.0.0
+      PORT: 3000
+      DATABASE_PATH: /data/lazysentry.db
+      # The image bakes both scanners onto PATH at the pinned versions
+      # recorded in apps/api/src/scanner/versions.ts — never a host path.
+      OSV_SCANNER_PATH: osv-scanner
+      TRUFFLEHOG_PATH: trufflehog
+    ports:
+      # Bound to loopback, not 0.0.0.0: put a reverse proxy in front to expose
+      # this beyond the host (docs/CONCEPT.md 6.2).
+      - "127.0.0.1:${PORT:-3000}:3000"
+    volumes:
+      - lazysentry-data:/data
+    # Container hardening (docs/CONCEPT.md 6.2). The api process itself only
+    # ever handles the admin's own requests and its own database, not foreign
+    # repository content — but there's no reason not to run it locked down
+    # too, and it costs nothing here.
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  worker:
+    build: .
+    image: lazysentry:local
+    command: ["node", "dist/worker.js"]
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_PATH: /data/lazysentry.db
+      OSV_SCANNER_PATH: osv-scanner
+      TRUFFLEHOG_PATH: trufflehog
+    volumes:
+      - lazysentry-data:/data
+    # The worker is the actual trust boundary (docs/CONCEPT.md 6.1): it clones
+    # and scans repositories whose dependencies and git history are not
+    # trusted. Non-root (baked into the image) + no capabilities + read-only
+    # root filesystem limits what a compromised dependency or a maliciously
+    # crafted repo can do to the host if it ever gets code execution here.
+    read_only: true
+    tmpfs:
+      # Scan clones land in the OS temp dir (docs/CONCEPT.md 0.3, 5.1) and are
+      # removed in a `finally` block, but a large repository's full history
+      # needs real room while a scan is in flight. Raise this (or bind-mount a
+      # host directory here instead) if scans of your largest repos fail with
+      # ENOSPC.
+      - /tmp:size=4g
+    cap_drop:
+      - ALL
+
+volumes:
+  lazysentry-data:

@@ -1,0 +1,32 @@
+# Keeps the build context small and, more importantly, keeps local dev state
+# out of the image entirely — `pnpm deploy` (used by the Dockerfile) copies
+# whatever it finds on disk, so anything dev-only has to be excluded here
+# rather than relied upon to be "clean".
+
+node_modules
+**/node_modules
+
+dist
+**/dist
+*.tsbuildinfo
+
+# Local SQLite database & WAL files (dev state, never belongs in an image)
+data
+**/data
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+.env
+.env.local
+
+.git
+.gitignore
+
+# Local scanner binaries for development — the image gets pinned copies from
+# their official release images instead (docs/CONCEPT.md 3.2).
+tools
+
+coverage
+.playwright-mcp

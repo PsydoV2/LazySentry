@@ -8,7 +8,13 @@ One `docker compose up -d`, one browser tab — and for every repository you car
 - 📦 **Outdated packages** — installed vs. latest registry version, classified as patch / minor / major
 - 🔑 **Leaked secrets** — working tree *and* full git history scanned with [TruffleHog](https://github.com/trufflesecurity/trufflehog), including live verification of found credentials
 
-> **Status: early development (pre-alpha).** The project is being built right now and is not usable yet. The roadmap below shows what's coming.
+> **Status: MVP.** Dependency/CVE tracking, version auditing, secret detection, GitHub import and the dashboard are implemented and covered by tests. Pre-1.0 — expect rough edges, and see the roadmap below for what's intentionally not here yet.
+
+## Screenshots
+
+![Sign-in screen](docs/screenshots/login.png)
+
+More screenshots (setup wizard, dashboard, project detail) are coming as the UI settles.
 
 ## Who is this for?
 
@@ -55,7 +61,35 @@ apps/api          Fastify server (serves API + built frontend) and the scan work
 apps/web          React frontend
 packages/shared   Zod schemas & types shared between API and frontend
 docs/CONCEPT.md   Full product & implementation spec (German)
+docs/SETUP.md     Step-by-step setup guide (Docker, GitHub token, first scan)
+Dockerfile, docker-compose.yml   Production image and two-service setup
 ```
+
+## Getting started (Docker)
+
+This is the supported way to run LazySentry. Requires Docker and Docker Compose v2.
+
+```sh
+git clone https://github.com/PsydoV2/lazysentry.git
+cd lazysentry
+cp .env.example .env
+# generate a key and paste it into .env as APP_ENCRYPTION_KEY:
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+
+docker compose up -d --build
+```
+
+Open **http://127.0.0.1:3000** — you land in the setup wizard (create the
+admin account, then connect GitHub with a personal access token scoped to
+`Contents: read` + `Metadata: read`). Full walkthrough, including exactly
+which GitHub token permissions to grant and how to read the dashboard once
+it's populated: **[docs/SETUP.md](docs/SETUP.md)**.
+
+`docker-compose.yml` runs two containers on one image and one shared SQLite
+volume — `api` (the dashboard) and `worker` (runs scans), both non-root with
+all capabilities dropped and a read-only root filesystem (docs/CONCEPT.md
+6.2). The published port is bound to `127.0.0.1`; put a reverse proxy in
+front to expose it beyond the host.
 
 ## Getting started (development)
 
@@ -84,11 +118,9 @@ repository is clean.
 
 Other commands: `pnpm build` (all packages), `pnpm test`, `pnpm typecheck`.
 
-A `docker compose up -d` production setup is part of the MVP and will be documented here once it lands.
-
 ## Roadmap
 
-**MVP (in progress):** dependency & CVE tracking, version auditing, secret detection with verification, GitHub import via personal access token, dashboard with per-project detail view.
+**MVP (done):** dependency & CVE tracking, version auditing, secret detection with verification, GitHub import via personal access token, dashboard with per-project detail view, Docker Compose setup.
 
 **After the MVP:** notifications (Discord first) & scheduled scans → EPSS/CISA-KEV prioritization → AI-assisted triage & upgrade hints → multi-provider support (GitLab, Bitbucket) & SBOM export.
 
