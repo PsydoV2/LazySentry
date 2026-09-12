@@ -1,0 +1,16 @@
+# Override for building the image from source instead of pulling it from
+# GHCR — only useful with a repo checkout on hand (contributors, or anyone
+# testing a local change to the Dockerfile). End users installing via Docker
+# don't need this file: docker-compose.yml alone pulls the published image.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+#
+# `build: .` layered onto the base file's `image:` tags the result with that
+# same name, so it's used exactly like the pulled image afterwards.
+
+services:
+  api:
+    build: .
+  worker:
+    build: .

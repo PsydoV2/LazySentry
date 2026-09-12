@@ -3,10 +3,16 @@
 # SQLite volume. There is no coupling between them beyond that file: the
 # worker polls the database directly, it does not talk to the api process.
 #
-# Quickstart:
+# Pulls the prebuilt image from GHCR — no repo checkout needed, just this
+# file and .env. Quickstart:
+#   curl -O https://raw.githubusercontent.com/PsydoV2/LazySentry/main/docker-compose.yml
+#   curl -O https://raw.githubusercontent.com/PsydoV2/LazySentry/main/.env.example
 #   cp .env.example .env   # then fill in APP_ENCRYPTION_KEY
-#   docker compose up -d --build
+#   docker compose up -d
 #   open http://127.0.0.1:3111
+#
+# Building from source instead (contributors): clone the repo, then
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 #
 # IMPORTANT: don't reuse a `.env` you already use for local `pnpm dev` as-is.
 # A dev .env typically pins DATABASE_PATH / OSV_SCANNER_PATH / TRUFFLEHOG_PATH
@@ -19,8 +25,7 @@
 
 services:
   api:
-    build: .
-    image: lazysentry:local
+    image: ghcr.io/psydov2/lazysentry:latest
     restart: unless-stopped
     env_file: .env
     environment:
@@ -63,8 +68,7 @@ services:
       start_period: 10s
 
   worker:
-    build: .
-    image: lazysentry:local
+    image: ghcr.io/psydov2/lazysentry:latest
     command: ["node", "dist/worker.js"]
     restart: unless-stopped
     env_file: .env

@@ -56,34 +56,44 @@ apps/web          React frontend
 packages/shared   Zod schemas & types shared between API and frontend
 docs/CONCEPT.md   Full product & implementation spec (German)
 docs/SETUP.md     Step-by-step setup guide (Docker, GitHub token, first scan)
-Dockerfile, docker-compose.yml   Production image and two-service setup
+Dockerfile                Image build (pushed to GHCR by CI)
+docker-compose.yml        Two-service setup, pulls the published image
+docker-compose.build.yml  Override to build from source instead
 ```
 
 ## Getting started (Docker)
 
-This is the supported way to run LazySentry. Requires Docker and Docker Compose v2.
+This is the supported way to run LazySentry. Requires Docker and Docker
+Compose v2 — **no git clone needed**, just two files:
 
 ```sh
-git clone https://github.com/PsydoV2/lazysentry.git
-cd lazysentry
+mkdir lazysentry && cd lazysentry
+curl -O https://raw.githubusercontent.com/PsydoV2/LazySentry/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/PsydoV2/LazySentry/main/.env.example
 cp .env.example .env
 # generate a key and paste it into .env as APP_ENCRYPTION_KEY:
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
-docker compose up -d --build
+docker compose up -d
 ```
 
-Open **http://127.0.0.1:3111** — you land in the setup wizard (create the
-admin account, then connect GitHub with a personal access token scoped to
-`Contents: read` + `Metadata: read`). Full walkthrough, including exactly
-which GitHub token permissions to grant and how to read the dashboard once
-it's populated: **[docs/SETUP.md](docs/SETUP.md)**.
+This pulls the prebuilt image from GHCR (`ghcr.io/psydov2/lazysentry`) —
+no local build step. Open **http://127.0.0.1:3111** — you land in the setup
+wizard (create the admin account, then connect GitHub with a personal
+access token scoped to `Contents: read` + `Metadata: read`). Full
+walkthrough, including exactly which GitHub token permissions to grant and
+how to read the dashboard once it's populated:
+**[docs/SETUP.md](docs/SETUP.md)**.
 
 `docker-compose.yml` runs two containers on one image and one shared SQLite
 volume — `api` (the dashboard) and `worker` (runs scans), both non-root with
 all capabilities dropped and a read-only root filesystem. The published
 port is bound to `127.0.0.1`; put a reverse proxy in front to expose it
 beyond the host.
+
+Prefer building from source instead of pulling the image? Clone the repo
+and run `docker compose -f docker-compose.yml -f docker-compose.build.yml
+up -d --build`.
 
 ## Getting started (development)
 

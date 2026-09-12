@@ -1,8 +1,8 @@
 # Setup guide
 
 This walks through getting LazySentry running with Docker Compose — the
-supported way to run it — from a clean checkout to your first scanned
-repository.
+supported way to run it — from nothing installed to your first scanned
+repository. No git checkout needed.
 
 ## Prerequisites
 
@@ -12,11 +12,14 @@ repository.
 Nothing else needs to be installed on the host — both scanners and the
 runtime are baked into the image.
 
-## 1. Get the code and configure the environment
+## 1. Get the two files you need and configure the environment
+
+No repo checkout required — just `docker-compose.yml` and `.env.example`:
 
 ```sh
-git clone https://github.com/PsydoV2/lazysentry.git
-cd lazysentry
+mkdir lazysentry && cd lazysentry
+curl -O https://raw.githubusercontent.com/PsydoV2/LazySentry/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/PsydoV2/LazySentry/main/.env.example
 cp .env.example .env
 ```
 
@@ -44,13 +47,13 @@ the Docker setup (they matter only for `pnpm dev`, see the main
 ## 2. Start it
 
 ```sh
-docker compose up -d --build
+docker compose up -d
 ```
 
-This builds the image (a couple of minutes the first time, seconds after)
-and starts two containers on one shared database volume: `api` (the
-dashboard, on `http://127.0.0.1:3111`) and `worker` (runs scans, has no
-exposed port). `docker compose logs -f` shows both.
+This pulls the published image and starts two containers on one shared
+database volume: `api` (the dashboard, on `http://127.0.0.1:3111`) and
+`worker` (runs scans, has no exposed port). `docker compose logs -f` shows
+both.
 
 ## 3. First run: create the admin account
 
@@ -127,8 +130,8 @@ repository entirely, both are per-project toggles under a project's
 ## Updating
 
 ```sh
-git pull
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
 
 Database migrations run automatically on `api` startup, against the
