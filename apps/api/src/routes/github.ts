@@ -102,25 +102,46 @@ export function registerGithubRoutes(app: FastifyInstance): void {
 
     const query = listQuerySchema.parse(request.query);
     const token = getAccountToken(account);
+    const search = query.search?.toLowerCase();
 
-    let page;
+    let repositories: Awaited<ReturnType<typeof githubProvider.listRepositories>>['repositories'];
+    let hasMore: boolean;
     try {
-      page = await githubProvider.listRepositories(token, {
-        page: query.page,
-        perPage: query.perPage,
-      });
+      if (search) {
+        // GitHub's `/user/repos` has no server-side name filter, and the
+        // requested page is only one slice of the account's repositories —
+        // filtering just that slice would hide matches that happen to live
+        // on a different page. So when searching, pull every page from
+        // GitHub first and filter across the full set, then paginate the
+        // filtered result ourselves.
+        const all: typeof repositories = [];
+        for (let ghPage = 1; ghPage <= 20; ghPage++) {
+          const result = await githubProvider.listRepositories(token, {
+            page: ghPage,
+            perPage: 100,
+          });
+          all.push(...result.repositories);
+          if (!result.hasMore) break;
+        }
+        const matched = all.filter((repo) =>
+          repo.fullName.toLowerCase().includes(search),
+        );
+        const start = (query.page - 1) * query.perPage;
+        repositories = matched.slice(start, start + query.perPage);
+        hasMore = start + query.perPage < matched.length;
+      } else {
+        const result = await githubProvider.listRepositories(token, {
+          page: query.page,
+          perPage: query.perPage,
+        });
+        repositories = result.repositories;
+        hasMore = result.hasMore;
+      }
       markAccountValid(account.id);
     } catch (error) {
       if (error instanceof ProviderAuthError) markAccountInvalid(account.id);
       return toApiError(error);
     }
-
-    const search = query.search?.toLowerCase();
-    const repositories = search
-      ? page.repositories.filter((repo) =>
-          repo.fullName.toLowerCase().includes(search),
-        )
-      : page.repositories;
 
     // Already-imported repositories are marked rather than hidden, so the
     // picker can grey them out (docs/CONCEPT.md 8.1).
@@ -138,7 +159,7 @@ export function registerGithubRoutes(app: FastifyInstance): void {
         imported: importedIds.has(repo.providerRepoId),
       })),
       page: query.page,
-      hasMore: page.hasMore,
+      hasMore,
     };
   });
 
