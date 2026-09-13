@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { toTruffleHogUri } from './trufflehog.js';
+
+// trufflehog.ts imports config.ts, which refuses to load without a master
+// key (docs/CONCEPT.md 4.2). Set a dummy one before the module is imported,
+// same convention as auth/session.test.ts.
+process.env.APP_ENCRYPTION_KEY ??= 'a'.repeat(64);
+
+const { toTruffleHogUri } = await import('./trufflehog.js');
 
 // process.platform is a getter on the process object; redefining it is the
 // standard way to test platform-specific branches without an OS-specific CI

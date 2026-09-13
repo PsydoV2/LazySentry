@@ -5,6 +5,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 const testDir = mkdtempSync(path.join(tmpdir(), 'lazysentry-test-'));
 process.env.DATABASE_PATH = path.join(testDir, 'test.db');
+// config.ts refuses to load without a master key (docs/CONCEPT.md 4.2).
+process.env.APP_ENCRYPTION_KEY ??= 'a'.repeat(64);
 
 const { closeDb, db, runMigrations } = await import('../db/client.js');
 const { jobs, projects, scans } = await import('../db/schema.js');
