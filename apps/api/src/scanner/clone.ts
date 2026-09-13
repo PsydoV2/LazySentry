@@ -33,9 +33,16 @@ export function newScanDir(): string {
  * The token goes into git's config via GIT_CONFIG_* environment variables
  * rather than the clone URL or a command-line argument: process arguments are
  * readable by anyone who can run `ps` on the host, environment variables are
- * not (docs/CONCEPT.md 0.3, 6.2).
+ * not (docs/CONCEPT.md 0.3, 6.2). The extraheader is scoped to the clone
+ * URL's own origin, so a token never gets sent to a different host — this
+ * also has to be derived from the URL rather than hardcoded, now that
+ * repositories can come from more than one provider/host.
  */
-function cloneEnv(token: string | undefined): NodeJS.ProcessEnv {
+export function cloneEnv(
+  cloneUrl: string,
+  token: string | undefined,
+  authUsername: string,
+): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     // Never let git block on an interactive credential prompt inside a
@@ -45,9 +52,10 @@ function cloneEnv(token: string | undefined): NodeJS.ProcessEnv {
   };
   if (token === undefined) return env;
 
-  const basic = Buffer.from(`x-access-token:${token}`).toString('base64');
+  const origin = new URL(cloneUrl).origin;
+  const basic = Buffer.from(`${authUsername}:${token}`).toString('base64');
   env.GIT_CONFIG_COUNT = '1';
-  env.GIT_CONFIG_KEY_0 = 'http.https://github.com/.extraheader';
+  env.GIT_CONFIG_KEY_0 = `http.${origin}/.extraheader`;
   env.GIT_CONFIG_VALUE_0 = `Authorization: Basic ${basic}`;
   return env;
 }
@@ -64,11 +72,12 @@ export async function cloneRepository(
   targetDir: string,
   token?: string,
   signal?: AbortSignal,
+  authUsername = 'x-access-token',
 ): Promise<{ commitSha: string }> {
   const clone = await execute(
     'git',
     ['clone', '--quiet', '--', cloneUrl, targetDir],
-    { timeoutMs: CLONE_TIMEOUT_MS, env: cloneEnv(token), signal },
+    { timeoutMs: CLONE_TIMEOUT_MS, env: cloneEnv(cloneUrl, token, authUsername), signal },
   );
   if (clone.cancelled) {
     throw new CloneError('git clone cancelled', false, true);

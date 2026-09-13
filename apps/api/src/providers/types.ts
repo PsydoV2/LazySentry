@@ -1,6 +1,6 @@
-// Provider abstraction. Only GitHub is implemented in the MVP
-// (docs/CONCEPT.md 2.2) — the interface exists so adding GitLab later is a
-// new file rather than a rewrite, not because other providers are planned now.
+// Provider abstraction. GitHub and GitLab are implemented — the interface
+// is what lets a new provider (Bitbucket, Gitea, …) be a new file instead of
+// a rewrite of everything that talks to "the" git account.
 
 export interface ProviderAccount {
   username: string;
@@ -31,12 +31,22 @@ export interface RepositoryPage {
   hasMore: boolean;
 }
 
+export type ProviderId = 'github' | 'gitlab';
+
 export interface GitProvider {
-  readonly id: 'github';
-  validateToken(token: string): Promise<ProviderAccount>;
+  readonly id: ProviderId;
+  readonly label: string;
+  /** Whether this provider can point at a self-hosted instance. */
+  readonly supportsCustomBaseUrl: boolean;
+  /** Used when the account did not specify a base URL. */
+  readonly defaultBaseUrl: string;
+  /** HTTP Basic auth username to pair with the token when cloning (0.3, 6.2). */
+  readonly cloneAuthUsername: string;
+  validateToken(token: string, baseUrl?: string): Promise<ProviderAccount>;
   listRepositories(
     token: string,
     options: { page: number; perPage: number },
+    baseUrl?: string,
   ): Promise<RepositoryPage>;
 }
 

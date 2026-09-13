@@ -1,24 +1,40 @@
 // Repository picker (docs/CONCEPT.md 8.1): paginated, searchable, multi
 // select, already-imported repositories greyed out rather than hidden.
+// Repositories come from one connected account at a time — a selector
+// appears once more than one account is connected.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EmptyState } from './EmptyState';
 import { LoadingState } from './LoadingState';
 import { IconChevronLeft, IconChevronRight, IconGithub } from './icons';
-import { api, ApiError, type RepositoryPage } from '../lib/api';
+import { api, ApiError, type GitAccountsList, type RepositoryPage } from '../lib/api';
 
 export function ImportDialog({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
+  const [accountId, setAccountId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
+  const accounts = useQuery({
+    queryKey: ['git-accounts'],
+    queryFn: () => api.get<GitAccountsList>('/api/git-accounts'),
+  });
+
+  // Default to the (first) connected account once the list arrives.
+  useEffect(() => {
+    if (accountId === null && accounts.data && accounts.data.accounts.length > 0) {
+      setAccountId(accounts.data.accounts[0]!.id);
+    }
+  }, [accountId, accounts.data]);
+
   const repositories = useQuery({
-    queryKey: ['repositories', page, search],
+    queryKey: ['repositories', accountId, page, search],
+    enabled: accountId !== null,
     queryFn: () =>
       api.get<RepositoryPage>(
-        `/api/git-accounts/github/repositories?page=${page}` +
+        `/api/git-accounts/${accountId}/repositories?page=${page}` +
           (search ? `&search=${encodeURIComponent(search)}` : ''),
       ),
   });
@@ -27,7 +43,7 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
     mutationFn: () =>
       api.post<{ imported: unknown[]; skipped: string[] }>(
         '/api/projects/import',
-        { repositoryIds: [...selected] },
+        { gitAccountId: accountId, repositoryIds: [...selected] },
       ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
@@ -44,6 +60,14 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
     });
   }
 
+  function switchAccount(id: number) {
+    setAccountId(id);
+    setPage(1);
+    setSelected(new Set());
+  }
+
+  const hasMultipleAccounts = (accounts.data?.accounts.length ?? 0) > 1;
+
   return (
     <div
       className="dialog-backdrop"
@@ -54,6 +78,20 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
       <div className="dialog" role="dialog" aria-modal="true" aria-label="Import projects">
         <div className="dialog-header stack">
           <h2>Import repositories</h2>
+
+          {hasMultipleAccounts && (
+            <select
+              value={accountId ?? ''}
+              onChange={(event) => switchAccount(Number(event.target.value))}
+            >
+              {accounts.data!.accounts.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.provider === 'gitlab' ? 'GitLab' : 'GitHub'} · {account.username}
+                </option>
+              ))}
+            </select>
+          )}
+
           <input
             type="search"
             value={search}
@@ -66,7 +104,11 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="dialog-body">
-          {repositories.isLoading && <LoadingState />}
+          {(accounts.isLoading || repositories.isLoading) && <LoadingState />}
+
+          {accounts.data && accounts.data.accounts.length === 0 && (
+            <EmptyState icon={IconGithub} message="No git account connected yet." />
+          )}
 
           {repositories.isError && (
             <p className="notice notice-error">

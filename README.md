@@ -8,7 +8,7 @@ One `docker compose up -d`, one browser tab — and for every repository you car
 - 📦 **Outdated packages** — installed vs. latest registry version, classified as patch / minor / major
 - 🔑 **Leaked secrets** — working tree _and_ full git history scanned with [TruffleHog](https://github.com/trufflesecurity/trufflehog), including live verification of found credentials
 
-> **Status: MVP.** Dependency/CVE tracking, version auditing, secret detection, GitHub import and the dashboard are implemented and covered by tests. Pre-1.0 — expect rough edges, and see the roadmap below for what's intentionally not here yet.
+> **Status: MVP.** Dependency/CVE tracking, version auditing, secret detection, GitHub/GitLab import (several accounts at once) and the dashboard are implemented and covered by tests. Pre-1.0 — expect rough edges, and see the roadmap below for what's intentionally not here yet.
 
 ## Who is this for?
 
@@ -80,10 +80,11 @@ docker compose up -d
 This pulls the prebuilt image from GHCR (`ghcr.io/psydov2/lazysentry`) —
 no local build step. Open **http://127.0.0.1:3111** — you land in the setup
 wizard (create the admin account, then connect GitHub with a personal
-access token scoped to `Contents: read` + `Metadata: read`). Full
-walkthrough, including exactly which GitHub token permissions to grant and
-how to read the dashboard once it's populated:
-**[docs/SETUP.md](docs/SETUP.md)**.
+access token scoped to `Contents: read` + `Metadata: read`). Additional
+accounts — more GitHub accounts, or GitLab (gitlab.com or self-hosted) —
+can be connected afterwards from Settings. Full walkthrough, including
+exactly which token permissions to grant and how to read the dashboard once
+it's populated: **[docs/SETUP.md](docs/SETUP.md)**.
 
 `docker-compose.yml` runs two containers on one image and one shared SQLite
 volume — `api` (the dashboard) and `worker` (runs scans), both non-root with
@@ -126,7 +127,7 @@ Other commands: `pnpm build` (all packages), `pnpm test`, `pnpm typecheck`.
 
 **MVP (done):** dependency & CVE tracking, version auditing, secret detection with verification, GitHub import via personal access token, dashboard with per-project detail view, Docker Compose setup.
 
-**After the MVP:** notifications (Discord first) & scheduled scans → EPSS/CISA-KEV prioritization → AI-assisted triage & upgrade hints → multi-provider support (GitLab, Bitbucket) & SBOM export.
+**After the MVP:** multi-provider & multi-account support (GitHub + GitLab, several accounts side by side — done) → notifications (Discord first) & scheduled scans → EPSS/CISA-KEV prioritization → AI-assisted triage & upgrade hints → SBOM export.
 
 ## License
 

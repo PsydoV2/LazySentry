@@ -77,10 +77,32 @@ export interface CurrentUser {
   username: string;
 }
 
-/** Connected git account — deliberately never carries the token itself. */
+/** Provider ids implemented today; the interface behind them stays abstract
+ * so a future one is a new file, not a rewrite (docs/CONCEPT.md 2.2). */
+export type GitProviderId = 'github' | 'gitlab';
+
+/** GET /api/providers — what the connect form can offer. */
+export interface ProviderInfo {
+  id: GitProviderId;
+  label: string;
+  supportsCustomBaseUrl: boolean;
+  defaultBaseUrl: string;
+}
+
+export interface ProvidersList {
+  providers: ProviderInfo[];
+}
+
+/**
+ * Connected git account — deliberately never carries the token itself.
+ * Several can be connected at once, including several for the same
+ * provider (e.g. a personal and a work GitHub account).
+ */
 export interface GitAccount {
   id: number;
   provider: string;
+  /** Set only for a self-hosted instance (e.g. a private GitLab). */
+  baseUrl: string | null;
   username: string;
   scopes: string[];
   /** 'valid' | 'invalid' — invalid asks the UI for a reconnect (6.2). */
@@ -89,9 +111,9 @@ export interface GitAccount {
   lastValidatedAt: number | null;
 }
 
-/** GET /api/git-accounts — null when nothing is connected yet. */
-export interface GitAccountStatus {
-  account: GitAccount | null;
+/** GET /api/git-accounts */
+export interface GitAccountsList {
+  accounts: GitAccount[];
 }
 
 export interface ConnectResult {

@@ -29,6 +29,23 @@ export function IconGithub(props: IconProps) {
   );
 }
 
+export function IconGitlab(props: IconProps) {
+  return (
+    <svg {...base(props)} strokeWidth={0} fill="currentColor" viewBox="0 0 24 24">
+      <path d="M12 21.42 15.9 9.6H8.1L12 21.42Z" />
+      <path d="M12 21.42 8.1 9.6H2.66L12 21.42Z" opacity={0.7} />
+      <path d="M2.66 9.6 1.3 13.8a.9.9 0 0 0 .33 1.01L12 21.42 2.66 9.6Z" opacity={0.45} />
+      <path d="M2.66 9.6H8.1L5.82 2.68a.42.42 0 0 0-.8 0L2.66 9.6Z" />
+      <path d="M12 21.42 15.9 9.6h5.44Z" opacity={0.7} />
+      <path
+        d="M21.34 9.6 22.7 13.8a.9.9 0 0 1-.33 1.01L12 21.42 21.34 9.6Z"
+        opacity={0.45}
+      />
+      <path d="M21.34 9.6H15.9l2.28-6.92a.42.42 0 0 1 .8 0l2.36 6.92Z" />
+    </svg>
+  );
+}
+
 export function IconLock(props: IconProps) {
   return (
     <svg {...base(props)}>

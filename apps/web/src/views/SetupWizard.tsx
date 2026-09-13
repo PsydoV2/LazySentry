@@ -4,9 +4,9 @@
 
 import { useState, type FormEvent } from 'react';
 import {
-  ConnectGithub,
+  ConnectGitAccount,
   TokenScopeWarning,
-} from '../components/ConnectGithub';
+} from '../components/ConnectGitAccount';
 import { api, ApiError, type ConnectResult, type SetupStatus } from '../lib/api';
 
 interface Props {
@@ -51,7 +51,7 @@ export function SetupWizard({ status, onComplete }: Props) {
                   repositories you want to watch.
                 </p>
               </div>
-              <ConnectGithub onConnected={setConnected} />
+              <ConnectGitAccount fixedProvider="github" onConnected={setConnected} />
             </div>
           )}
         </div>

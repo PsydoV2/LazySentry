@@ -94,6 +94,13 @@ scoped the same way:
 Once this succeeds you land on the empty dashboard: _"No projects yet —
 import your first repository."_
 
+**More accounts.** The wizard connects one GitHub account to get you
+started fast. Afterwards, open **Settings → Git accounts → Add account** to
+connect additional accounts — another GitHub account (e.g. a work account
+alongside a personal one), or GitLab (gitlab.com or a self-hosted instance,
+using a personal access token with `read_api` + `read_repository`). Each
+imported project keeps using the account it was imported with.
+
 ## 5. Import a repository
 
 **Import project** → pick one or more repositories from the list (it's the

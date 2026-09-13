@@ -1,28 +1,45 @@
 // Instance settings (docs/CONCEPT.md 6.2 reconnect flow): connected git
-// accounts today, a placeholder for provider API keys later — this stays a
-// placeholder on purpose, see the note on the card below (rule 5: no
-// multi-provider/AI work starts here just because the UI has a spot for it).
+// accounts — several at once, across GitHub and GitLab.
 
 import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ConnectGithub, TokenScopeWarning } from '../components/ConnectGithub';
-import { IconGithub, IconKey } from '../components/icons';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  ConnectGitAccount,
+  ReconnectAccount,
+  TokenScopeWarning,
+} from '../components/ConnectGitAccount';
+import { IconGithub, IconGitlab, IconKey, IconPlus } from '../components/icons';
 import { Modal } from '../components/Modal';
-import { api, ApiError, type ConnectResult, type GitAccountStatus } from '../lib/api';
+import {
+  api,
+  ApiError,
+  type ConnectResult,
+  type GitAccount,
+  type GitAccountsList,
+} from '../lib/api';
 import { relativeTime } from '../lib/format';
+
+function ProviderIcon({ provider }: { provider: string }) {
+  return provider === 'gitlab' ? <IconGitlab /> : <IconGithub />;
+}
 
 export function Settings({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
-  const [reconnecting, setReconnecting] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [justConnected, setJustConnected] = useState<ConnectResult | null>(null);
 
-  const account = useQuery({
-    queryKey: ['git-account'],
-    queryFn: () => api.get<GitAccountStatus>('/api/git-accounts'),
+  const accounts = useQuery({
+    queryKey: ['git-accounts'],
+    queryFn: () => api.get<GitAccountsList>('/api/git-accounts'),
   });
 
-  function closeReconnectForm(): void {
-    setReconnecting(false);
+  function invalidateAccounts(): void {
+    queryClient.invalidateQueries({ queryKey: ['git-accounts'] });
+    queryClient.invalidateQueries({ queryKey: ['setup-status'] });
+  }
+
+  function closeAddForm(): void {
+    setAdding(false);
     setJustConnected(null);
   }
 
@@ -34,65 +51,48 @@ export function Settings({ onClose }: { onClose: () => void }) {
     >
       <div className="stack">
         <div className="card stack">
-          <div className="row">
-            <IconGithub />
-            <h2>Git accounts</h2>
+          <div className="row spread">
+            <div className="row">
+              <IconGithub />
+              <h2>Git accounts</h2>
+            </div>
+            {!adding && (
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setAdding(true)}
+              >
+                <IconPlus /> Add account
+              </button>
+            )}
           </div>
 
-          {account.isLoading && <p className="muted">Loading…</p>}
-          {account.isError && (
+          {accounts.isLoading && <p className="muted">Loading…</p>}
+          {accounts.isError && (
             <p className="notice notice-error">
-              {account.error instanceof ApiError
-                ? account.error.message
-                : 'Could not load the connected account.'}
+              {accounts.error instanceof ApiError
+                ? accounts.error.message
+                : 'Could not load connected accounts.'}
             </p>
           )}
 
-          {account.data && !account.data.account && !reconnecting && (
+          {accounts.data && accounts.data.accounts.length === 0 && !adding && (
             <>
-              <p className="subtle">No GitHub account connected yet.</p>
+              <p className="subtle">No git account connected yet.</p>
               <div>
-                <button
-                  type="button"
-                  className="btn-primary"
-                  onClick={() => setReconnecting(true)}
-                >
-                  Connect GitHub
+                <button type="button" className="btn-primary" onClick={() => setAdding(true)}>
+                  Connect an account
                 </button>
               </div>
             </>
           )}
 
-          {account.data?.account && !reconnecting && (
-            <div className="settings-row">
-              <span className="stack" style={{ gap: 2 }}>
-                <strong>{account.data.account.username}</strong>
-                <span className="subtle">
-                  {account.data.account.scopes.length > 0
-                    ? account.data.account.scopes.join(', ')
-                    : 'scopes unknown'}{' '}
-                  · connected {relativeTime(account.data.account.connectedAt)}
-                </span>
-              </span>
-              <span className="row">
-                <span
-                  className={`pill ${account.data.account.status === 'valid' ? 'pill-ok' : 'pill-critical'}`}
-                >
-                  {account.data.account.status === 'valid' ? 'Connected' : 'Reconnect needed'}
-                </span>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => setReconnecting(true)}
-                >
-                  {account.data.account.status === 'valid' ? 'Replace token' : 'Reconnect'}
-                </button>
-              </span>
-            </div>
-          )}
+          {accounts.data?.accounts.map((account) => (
+            <AccountRow key={account.id} account={account} onChanged={invalidateAccounts} />
+          ))}
 
-          {reconnecting && (
-            <div className="stack">
+          {adding && (
+            <div className="stack" style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--space-3)' }}>
               {justConnected ? (
                 <>
                   <p className="notice notice-info">
@@ -101,17 +101,15 @@ export function Settings({ onClose }: { onClose: () => void }) {
                   <TokenScopeWarning result={justConnected} />
                 </>
               ) : (
-                <ConnectGithub
-                  submitLabel={account.data?.account ? 'Reconnect' : 'Connect'}
+                <ConnectGitAccount
                   onConnected={(result) => {
                     setJustConnected(result);
-                    queryClient.invalidateQueries({ queryKey: ['git-account'] });
-                    queryClient.invalidateQueries({ queryKey: ['setup-status'] });
+                    invalidateAccounts();
                   }}
                 />
               )}
               <div>
-                <button type="button" className="btn-quiet" onClick={closeReconnectForm}>
+                <button type="button" className="btn-quiet" onClick={closeAddForm}>
                   {justConnected ? 'Done' : 'Cancel'}
                 </button>
               </div>
@@ -126,10 +124,128 @@ export function Settings({ onClose }: { onClose: () => void }) {
           </div>
           <p className="subtle">
             Support for additional provider API keys is planned but not available
-            yet — LazySentry only talks to GitHub today.
+            yet.
           </p>
         </div>
       </div>
     </Modal>
+  );
+}
+
+function AccountRow({
+  account,
+  onChanged,
+}: {
+  account: GitAccount;
+  onChanged: () => void;
+}) {
+  const [reconnecting, setReconnecting] = useState(false);
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
+  const [justReconnected, setJustReconnected] = useState<ConnectResult | null>(null);
+
+  const remove = useMutation({
+    mutationFn: () => api.delete<void>(`/api/git-accounts/${account.id}`),
+    onSuccess: () => {
+      setConfirmingRemove(false);
+      onChanged();
+    },
+  });
+
+  return (
+    <div className="stack" style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--space-3)' }}>
+      <div className="settings-row">
+        <span className="row">
+          <ProviderIcon provider={account.provider} />
+          <span className="stack" style={{ gap: 2 }}>
+            <strong>{account.username}</strong>
+            <span className="subtle">
+              {account.baseUrl ? `${account.baseUrl} · ` : ''}
+              {account.scopes.length > 0 ? account.scopes.join(', ') : 'scopes unknown'} ·
+              connected {relativeTime(account.connectedAt)}
+            </span>
+          </span>
+        </span>
+        <span className="row">
+          <span className={`pill ${account.status === 'valid' ? 'pill-ok' : 'pill-critical'}`}>
+            {account.status === 'valid' ? 'Connected' : 'Reconnect needed'}
+          </span>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => {
+              setReconnecting((current) => !current);
+              setJustReconnected(null);
+            }}
+          >
+            {account.status === 'valid' ? 'Replace token' : 'Reconnect'}
+          </button>
+          {!confirmingRemove ? (
+            <button type="button" className="btn-danger" onClick={() => setConfirmingRemove(true)}>
+              Remove
+            </button>
+          ) : (
+            <>
+              <span className="muted">Remove?</span>
+              <button
+                type="button"
+                className="btn-danger"
+                disabled={remove.isPending}
+                onClick={() => remove.mutate()}
+              >
+                {remove.isPending ? 'Removing…' : 'Confirm'}
+              </button>
+              <button
+                type="button"
+                className="btn-quiet"
+                onClick={() => setConfirmingRemove(false)}
+              >
+                Cancel
+              </button>
+            </>
+          )}
+        </span>
+      </div>
+
+      {remove.isError && (
+        <p className="notice notice-error">
+          {remove.error instanceof ApiError
+            ? remove.error.message
+            : 'Could not remove this account.'}
+        </p>
+      )}
+
+      {reconnecting && (
+        <div className="stack">
+          {justReconnected ? (
+            <>
+              <p className="notice notice-info">
+                Connected as {justReconnected.account.username}.
+              </p>
+              <TokenScopeWarning result={justReconnected} />
+            </>
+          ) : (
+            <ReconnectAccount
+              accountId={account.id}
+              onConnected={(result) => {
+                setJustReconnected(result);
+                onChanged();
+              }}
+            />
+          )}
+          <div>
+            <button
+              type="button"
+              className="btn-quiet"
+              onClick={() => {
+                setReconnecting(false);
+                setJustReconnected(null);
+              }}
+            >
+              {justReconnected ? 'Done' : 'Cancel'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

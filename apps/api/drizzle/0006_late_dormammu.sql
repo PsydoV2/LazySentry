@@ -1,0 +1,1 @@
+ALTER TABLE `git_accounts` ADD `base_url` text;

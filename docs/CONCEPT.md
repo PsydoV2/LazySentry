@@ -84,13 +84,16 @@ Ein vollständig selbsthostbares Security- und Wartungs-Dashboard für einzelne 
 
 Diese Punkte sind bewusst ausgeschlossen. Agents sollen sie **nicht** vorwegnehmen, auch nicht „schon mal vorbereiten":
 
-- Multi-Provider (GitLab, Bitbucket, Gitea) — Provider-Interface wird sauber abstrahiert, aber nur GitHub implementiert
 - Mehrbenutzerbetrieb, Rollen, Teams
 - Webhooks, Tunneling, Event-getriebene Scans
 - KI-Features jeglicher Art
 - License-Compliance
 - PostgreSQL (SQLite reicht; die Abstraktion muss den späteren Wechsel erlauben)
 - SBOM-Export
+
+> **Entscheidung 2026-09-13:** Multi-Provider/Multi-Account stand ursprünglich hier
+> (als Phase 6, siehe 2.3) und war für das MVP ausgeschlossen. Der Projektinhaber
+> hat das nach Fertigstellung des MVP bewusst vorgezogen — siehe 2.4.
 
 ### 2.3 Roadmap (nach dem MVP)
 
@@ -99,9 +102,19 @@ Diese Punkte sind bewusst ausgeschlossen. Agents sollen sie **nicht** vorwegnehm
 | **3** | Notifications (Discord-Webhook zuerst), Cron-Scheduling, Suppression-Workflow         |
 | **4** | EPSS- und CISA-KEV-Anreicherung zur Priorisierung, Sustainability-/Dead-Project-Score |
 | **5** | KI-Layer: Triage-Assistent, Reachability-Einschätzung, Upgrade-Assistent              |
-| **6** | Multi-Provider, SBOM-Export (CycloneDX), Webhooks                                     |
+| **6** | SBOM-Export (CycloneDX), Webhooks                                                     |
 
 Die KI-Features sind bewusst spät angesetzt, aber sie sind fester Bestandteil der Produktvision — die Architektur muss sie ab Tag eins ermöglichen (siehe Abschnitt 9).
+
+### 2.4 Multi-Provider & Mehrfach-Accounts (vorgezogen, 2026-09-13)
+
+Ursprünglich Phase 6, auf expliziten Wunsch des Projektinhabers direkt nach dem MVP umgesetzt — nicht "schon mal vorbereitet", sondern bewusst vollständig gebaut:
+
+- **Mehrere Git-Accounts gleichzeitig verbunden**, auch mehrere desselben Providers (z. B. privater und geschäftlicher GitHub-Account). Jedes Projekt hängt über `git_account_id` an genau einem Account; Scans nutzen ausschließlich das Token des eigenen Accounts, nie „irgendein" verbundenes Konto.
+- **Zweiter Provider: GitLab**, inklusive selbst gehosteter Instanzen (`git_accounts.base_url`, `null` = gitlab.com). Das Provider-Interface (`apps/api/src/providers/types.ts`) ist entsprechend erweitert: `validateToken`/`listRepositories` nehmen optional eine Basis-URL, jeder Provider deklariert `cloneAuthUsername` für den HTTP-Basic-Auth-User beim Clone (GitHub: `x-access-token`, GitLab: `oauth2`).
+- **Clone-Auth ist jetzt Host-basiert statt hartcodiert auf `github.com`** (`git config http.<origin>/.extraheader`) — Voraussetzung dafür, dass ein Token nicht versehentlich an den falschen Host geht, sobald mehrere Hosts im Spiel sind.
+- Bitbucket/Gitea sind weiterhin **nicht** implementiert — die Registry in `apps/api/src/providers/index.ts` macht das Hinzufügen eines weiteren Providers zu einer neuen Datei, aber niemand hat danach gefragt.
+- Löschen eines Git-Accounts ist blockiert (409), solange noch Projekte daran hängen (`DELETE /api/git-accounts/:id`) — das DB-Schema erlaubt zwar `ON DELETE CASCADE`, das wird aber nicht stillschweigend ausgelöst.
 
 ---
 
@@ -176,8 +189,10 @@ settings
   key, value_encrypted, is_secret
 
 git_accounts
-  id, provider ('github'), username, token_encrypted,
-  token_scopes, connected_at, last_validated_at
+  id, provider ('github'|'gitlab'), base_url (null = provider's public SaaS),
+  username, token_encrypted, token_scopes, status ('valid'|'invalid'),
+  connected_at, last_validated_at
+  -- mehrere Accounts gleichzeitig, auch mehrere desselben Providers (2.4)
 
 projects
   id, git_account_id, provider_repo_id, name, full_name,

@@ -18,7 +18,7 @@ import { ScanEventStream } from './events/scan-events.js';
 import { AppError, NOT_FOUND_BODY, registerErrorHandler } from './lib/errors.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerEventRoutes } from './routes/events.js';
-import { registerGithubRoutes } from './routes/github.js';
+import { registerGitAccountRoutes } from './routes/git-accounts.js';
 import { registerProjectRoutes } from './routes/projects.js';
 import { registerSetupRoutes } from './routes/setup.js';
 
@@ -82,7 +82,7 @@ export async function startApi(): Promise<FastifyInstance> {
 
   registerSetupRoutes(app);
   registerAuthRoutes(app);
-  registerGithubRoutes(app);
+  registerGitAccountRoutes(app);
   registerProjectRoutes(app);
 
   // Scan progress reaches the browser over SSE; the worker's status changes are

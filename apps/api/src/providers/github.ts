@@ -110,6 +110,14 @@ function toRepository(repo: GitHubRepo): ProviderRepository {
 
 export const githubProvider: GitProvider = {
   id: 'github',
+  label: 'GitHub',
+  // GitHub Enterprise Server has a different API root per instance, which
+  // would need its own base-path handling; out of scope for now, so only
+  // github.com is supported (docs/CONCEPT.md 2.2 — provider interface stays
+  // abstract, but no new provider surface is built speculatively).
+  supportsCustomBaseUrl: false,
+  defaultBaseUrl: 'https://github.com',
+  cloneAuthUsername: 'x-access-token',
 
   async validateToken(token: string): Promise<ProviderAccount> {
     const { body, headers } = await githubFetch('/user', token);
@@ -130,6 +138,7 @@ export const githubProvider: GitProvider = {
     token: string,
     { page, perPage },
   ): Promise<RepositoryPage> {
+    // No baseUrl parameter here — github.com only (see supportsCustomBaseUrl).
     const query = new URLSearchParams({
       per_page: String(perPage),
       page: String(page),

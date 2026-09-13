@@ -4,7 +4,7 @@
 
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { getGitAccount, toPublicAccount } from '../accounts/git-accounts.js';
+import { listGitAccounts } from '../accounts/git-accounts.js';
 import { requireSameOrigin } from '../auth/session.js';
 import {
   adminAccountExists,
@@ -30,11 +30,11 @@ export function registerSetupRoutes(app: FastifyInstance): void {
   // wizard or the login form before anyone can log in. It leaks only whether
   // setup has happened, which is visible from the UI anyway.
   app.get('/api/setup/status', async () => {
-    const account = getGitAccount();
+    const hasAccount = listGitAccounts().length > 0;
     return {
       adminAccountExists: adminAccountExists(),
-      gitAccountConnected: account !== undefined,
-      complete: adminAccountExists() && account !== undefined,
+      gitAccountConnected: hasAccount,
+      complete: adminAccountExists() && hasAccount,
     };
   });
 
@@ -54,10 +54,5 @@ export function registerSetupRoutes(app: FastifyInstance): void {
     request.session.username = user.username;
 
     return reply.status(201).send({ id: user.id, username: user.username });
-  });
-
-  app.get('/api/git-account', async () => {
-    const account = getGitAccount();
-    return account ? toPublicAccount(account) : null;
   });
 }

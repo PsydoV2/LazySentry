@@ -1,12 +1,16 @@
-// Storage for connected git accounts. The token is encrypted at rest
-// (docs/CONCEPT.md 4.2) and only decrypted where it is actually used: the
-// provider API calls and the clone step.
+// Storage for connected git accounts. Several accounts can be connected at
+// once — including several for the same provider (e.g. a personal and a
+// work GitHub account) — each project points at exactly one of them via
+// `git_account_id`. The token is encrypted at rest (docs/CONCEPT.md 4.2) and
+// only decrypted where it is actually used: the provider API calls and the
+// clone step.
 
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { config } from '../config.js';
 import { db } from '../db/client.js';
-import { gitAccounts } from '../db/schema.js';
+import { gitAccounts, projects } from '../db/schema.js';
 import { decrypt, encrypt } from '../lib/crypto.js';
+import type { ProviderId } from '../providers/types.js';
 
 export type GitAccount = typeof gitAccounts.$inferSelect;
 
@@ -14,6 +18,7 @@ export type GitAccount = typeof gitAccounts.$inferSelect;
 export interface PublicGitAccount {
   id: number;
   provider: string;
+  baseUrl: string | null;
   username: string;
   scopes: string[];
   status: string;
@@ -25,6 +30,7 @@ export function toPublicAccount(account: GitAccount): PublicGitAccount {
   return {
     id: account.id,
     provider: account.provider,
+    baseUrl: account.baseUrl,
     username: account.username,
     scopes: account.tokenScopes ?? [],
     status: account.status,
@@ -33,40 +39,85 @@ export function toPublicAccount(account: GitAccount): PublicGitAccount {
   };
 }
 
-export function getGitAccount(): GitAccount | undefined {
-  // Single account in the MVP; the oldest row wins if one ever slipped in.
-  return db.select().from(gitAccounts).orderBy(gitAccounts.id).get();
+export function listGitAccounts(): GitAccount[] {
+  return db.select().from(gitAccounts).orderBy(gitAccounts.id).all();
 }
 
-export function saveGitAccount(input: {
-  provider: 'github';
+export function getGitAccountById(id: number): GitAccount | undefined {
+  return db.select().from(gitAccounts).where(eq(gitAccounts.id, id)).get();
+}
+
+/** Same (provider, base URL, username) already connected — a 409, not a duplicate row. */
+export function findMatchingAccount(
+  provider: ProviderId,
+  baseUrl: string | null,
+  username: string,
+): GitAccount | undefined {
+  return db
+    .select()
+    .from(gitAccounts)
+    .where(and(eq(gitAccounts.provider, provider), eq(gitAccounts.username, username)))
+    .all()
+    .find((row) => row.baseUrl === baseUrl);
+}
+
+export function createGitAccount(input: {
+  provider: ProviderId;
+  baseUrl: string | null;
   username: string;
   token: string;
   scopes: string[];
 }): GitAccount {
   const now = new Date();
-  const values = {
-    provider: input.provider,
-    username: input.username,
-    tokenEncrypted: encrypt(input.token, config.encryptionKey),
-    tokenScopes: input.scopes,
-    status: 'valid',
-    connectedAt: now,
-    lastValidatedAt: now,
-  };
+  return db
+    .insert(gitAccounts)
+    .values({
+      provider: input.provider,
+      baseUrl: input.baseUrl,
+      username: input.username,
+      tokenEncrypted: encrypt(input.token, config.encryptionKey),
+      tokenScopes: input.scopes,
+      status: 'valid',
+      connectedAt: now,
+      lastValidatedAt: now,
+    })
+    .returning()
+    .get();
+}
 
-  const existing = getGitAccount();
-  if (existing) {
-    // Reconnecting replaces the token in place so imported projects keep
-    // pointing at the same account row.
-    return db
-      .update(gitAccounts)
-      .set(values)
-      .where(eq(gitAccounts.id, existing.id))
-      .returning()
-      .get();
-  }
-  return db.insert(gitAccounts).values(values).returning().get();
+/**
+ * Replaces the token on an existing account in place, so projects that
+ * already point at it keep working (docs/CONCEPT.md 6.2 reconnect flow).
+ */
+export function reconnectGitAccount(
+  id: number,
+  input: { username: string; token: string; scopes: string[] },
+): GitAccount {
+  return db
+    .update(gitAccounts)
+    .set({
+      username: input.username,
+      tokenEncrypted: encrypt(input.token, config.encryptionKey),
+      tokenScopes: input.scopes,
+      status: 'valid',
+      lastValidatedAt: new Date(),
+    })
+    .where(eq(gitAccounts.id, id))
+    .returning()
+    .get();
+}
+
+/** Number of imported projects still pointing at this account. */
+export function countProjectsForAccount(accountId: number): number {
+  return db
+    .select()
+    .from(projects)
+    .where(eq(projects.gitAccountId, accountId))
+    .all().length;
+}
+
+export function deleteGitAccount(id: number): void {
+  db.delete(gitAccounts).where(eq(gitAccounts.id, id)).run();
 }
 
 export function getAccountToken(account: GitAccount): string {

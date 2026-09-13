@@ -16,9 +16,10 @@ import { redactSecret } from '../lib/redact.js';
 import { classifySeverity } from '../lib/severity.js';
 import {
   getAccountToken,
-  getGitAccount,
+  getGitAccountById,
   markAccountInvalid,
 } from '../accounts/git-accounts.js';
+import { getProvider, isProviderId } from '../providers/index.js';
 import {
   CloneError,
   cloneRepository,
@@ -85,13 +86,27 @@ export async function runScan(
   try {
     checkCancelled(signal);
 
-    // Private repositories need the connected account's token; the hardcoded
-    // development project has no account and clones anonymously.
-    const account = project.gitAccountId === null ? undefined : getGitAccount();
+    // Private repositories need this project's own connected account's
+    // token; the hardcoded development project has no account and clones
+    // anonymously. Each project is scanned with the account it was imported
+    // with, never "whichever account happens to be connected" — there can
+    // be several now.
+    const account =
+      project.gitAccountId === null ? undefined : getGitAccountById(project.gitAccountId);
     const token = account ? getAccountToken(account) : undefined;
+    const authUsername =
+      account && isProviderId(account.provider)
+        ? getProvider(account.provider).cloneAuthUsername
+        : 'x-access-token';
 
     try {
-      ({ commitSha } = await cloneRepository(project.cloneUrl, scanDir, token, signal));
+      ({ commitSha } = await cloneRepository(
+        project.cloneUrl,
+        scanDir,
+        token,
+        signal,
+        authUsername,
+      ));
     } catch (cloneError) {
       if (cloneError instanceof CloneError && cloneError.isCancelled) {
         throw new ScanCancelledError();

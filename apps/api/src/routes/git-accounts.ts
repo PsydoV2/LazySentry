@@ -1,26 +1,38 @@
-// GitHub connect and repository import (docs/CONCEPT.md 7, 8.1).
+// Connecting git accounts (GitHub and GitLab, several at once) and importing
+// repositories from them (docs/CONCEPT.md 7, 8.1).
 
 import type { FastifyInstance } from 'fastify';
 import { inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import {
+  countProjectsForAccount,
+  createGitAccount,
+  deleteGitAccount,
+  findMatchingAccount,
   getAccountToken,
-  getGitAccount,
+  getGitAccountById,
+  listGitAccounts,
   markAccountInvalid,
   markAccountValid,
-  saveGitAccount,
+  reconnectGitAccount,
   toPublicAccount,
 } from '../accounts/git-accounts.js';
 import { requireAuth, requireSameOrigin } from '../auth/session.js';
 import { db } from '../db/client.js';
 import { projects } from '../db/schema.js';
-import { AppError, badRequest, notFound } from '../lib/errors.js';
+import { AppError, badRequest, conflict, notFound } from '../lib/errors.js';
 import { enqueueScanJob } from '../queue/jobs.js';
-import { githubProvider } from '../providers/github.js';
+import { getProvider, isProviderId, PROVIDER_LIST } from '../providers/index.js';
 import { ProviderAuthError, ProviderRequestError } from '../providers/types.js';
 import { adminAccountExists } from '../auth/users.js';
 
 const connectSchema = z.object({
+  provider: z.enum(['github', 'gitlab']),
+  token: z.string().trim().min(1, 'Token must not be empty'),
+  baseUrl: z.string().trim().url().optional(),
+});
+
+const reconnectSchema = z.object({
   token: z.string().trim().min(1, 'Token must not be empty'),
 });
 
@@ -31,6 +43,7 @@ const listQuerySchema = z.object({
 });
 
 const importSchema = z.object({
+  gitAccountId: z.coerce.number().int().positive(),
   repositoryIds: z
     .array(z.string().min(1))
     .min(1, 'Select at least one repository')
@@ -48,7 +61,18 @@ function toApiError(error: unknown): never {
   throw error;
 }
 
-export function registerGithubRoutes(app: FastifyInstance): void {
+function normalizeBaseUrl(baseUrl: string | undefined): string | null {
+  if (baseUrl === undefined) return null;
+  return baseUrl.replace(/\/+$/, '');
+}
+
+function requireAccount(id: number) {
+  const account = getGitAccountById(id);
+  if (!account) throw notFound('Git account not found');
+  return account;
+}
+
+export function registerGitAccountRoutes(app: FastifyInstance): void {
   /**
    * Connecting is allowed during setup, before a session exists — but only
    * while there is no admin account yet, i.e. inside the wizard. Afterwards
@@ -61,21 +85,43 @@ export function registerGithubRoutes(app: FastifyInstance): void {
     }
   }
 
+  app.get('/api/providers', async () => ({
+    providers: PROVIDER_LIST.map((p) => ({
+      id: p.id,
+      label: p.label,
+      supportsCustomBaseUrl: p.supportsCustomBaseUrl,
+      defaultBaseUrl: p.defaultBaseUrl,
+    })),
+  }));
+
   app.post(
-    '/api/git-accounts/github',
+    '/api/git-accounts',
     { config: { rateLimit: { max: 10, timeWindow: '5 minutes' } } },
     async (request, reply) => {
       requireSetupOrAuth(request);
-      const { token } = connectSchema.parse(request.body);
+      const input = connectSchema.parse(request.body);
+      const provider = getProvider(input.provider);
 
-      const account = await githubProvider
-        .validateToken(token)
-        .catch(toApiError);
+      if (input.baseUrl && !provider.supportsCustomBaseUrl) {
+        throw badRequest(`${provider.label} does not support a custom base URL`);
+      }
+      const baseUrl = provider.supportsCustomBaseUrl ? normalizeBaseUrl(input.baseUrl) : null;
 
-      const saved = saveGitAccount({
-        provider: 'github',
+      const account = await provider.validateToken(input.token, baseUrl ?? undefined).catch(toApiError);
+
+      const existing = findMatchingAccount(input.provider, baseUrl, account.username);
+      if (existing) {
+        throw conflict(
+          'GIT_ACCOUNT_ALREADY_CONNECTED',
+          `${account.username} on ${provider.label} is already connected`,
+        );
+      }
+
+      const saved = createGitAccount({
+        provider: input.provider,
+        baseUrl,
         username: account.username,
-        token,
+        token: input.token,
         scopes: account.scopes,
       });
 
@@ -88,52 +134,106 @@ export function registerGithubRoutes(app: FastifyInstance): void {
     },
   );
 
-  /** Connected account status for the Settings page (docs/CONCEPT.md 6.2). */
+  /** Connected accounts for the Settings page (docs/CONCEPT.md 6.2). */
   app.get('/api/git-accounts', async (request) => {
     requireAuth(request);
-    const account = getGitAccount();
-    return { account: account ? toPublicAccount(account) : null };
+    return { accounts: listGitAccounts().map(toPublicAccount) };
   });
 
-  app.get('/api/git-accounts/github/repositories', async (request) => {
+  app.post(
+    '/api/git-accounts/:id/reconnect',
+    { config: { rateLimit: { max: 10, timeWindow: '5 minutes' } } },
+    async (request, reply) => {
+      requireAuth(request);
+      requireSameOrigin(request);
+      const { id } = z.object({ id: z.coerce.number().int() }).parse(request.params);
+      const account = requireAccount(id);
+      if (!isProviderId(account.provider)) {
+        throw new AppError(500, 'INTERNAL_ERROR', 'Unknown provider on stored account');
+      }
+      const { token } = reconnectSchema.parse(request.body);
+      const provider = getProvider(account.provider);
+
+      const validated = await provider
+        .validateToken(token, account.baseUrl ?? undefined)
+        .catch(toApiError);
+
+      const saved = reconnectGitAccount(id, {
+        username: validated.username,
+        token,
+        scopes: validated.scopes,
+      });
+
+      return reply.status(200).send({
+        account: toPublicAccount(saved),
+        writeScopes: validated.writeScopes,
+        scopesUnknown: validated.scopesUnknown,
+      });
+    },
+  );
+
+  app.delete('/api/git-accounts/:id', async (request, reply) => {
     requireAuth(request);
-    const account = getGitAccount();
-    if (!account) throw notFound('No GitHub account connected');
+    requireSameOrigin(request);
+    const { id } = z.object({ id: z.coerce.number().int() }).parse(request.params);
+    requireAccount(id);
+
+    const projectCount = countProjectsForAccount(id);
+    if (projectCount > 0) {
+      throw conflict(
+        'GIT_ACCOUNT_HAS_PROJECTS',
+        `${projectCount} imported project(s) still use this account. Remove them first.`,
+      );
+    }
+
+    deleteGitAccount(id);
+    return reply.status(204).send();
+  });
+
+  app.get('/api/git-accounts/:id/repositories', async (request) => {
+    requireAuth(request);
+    const { id } = z.object({ id: z.coerce.number().int() }).parse(request.params);
+    const account = requireAccount(id);
+    if (!isProviderId(account.provider)) {
+      throw new AppError(500, 'INTERNAL_ERROR', 'Unknown provider on stored account');
+    }
+    const provider = getProvider(account.provider);
 
     const query = listQuerySchema.parse(request.query);
     const token = getAccountToken(account);
     const search = query.search?.toLowerCase();
+    const baseUrl = account.baseUrl ?? undefined;
 
-    let repositories: Awaited<ReturnType<typeof githubProvider.listRepositories>>['repositories'];
+    let repositories: Awaited<ReturnType<typeof provider.listRepositories>>['repositories'];
     let hasMore: boolean;
     try {
       if (search) {
-        // GitHub's `/user/repos` has no server-side name filter, and the
+        // The provider's repo list has no server-side name filter, and the
         // requested page is only one slice of the account's repositories —
         // filtering just that slice would hide matches that happen to live
-        // on a different page. So when searching, pull every page from
-        // GitHub first and filter across the full set, then paginate the
-        // filtered result ourselves.
+        // on a different page. So when searching, pull every page first and
+        // filter across the full set, then paginate the filtered result
+        // ourselves.
         const all: typeof repositories = [];
-        for (let ghPage = 1; ghPage <= 20; ghPage++) {
-          const result = await githubProvider.listRepositories(token, {
-            page: ghPage,
-            perPage: 100,
-          });
+        for (let providerPage = 1; providerPage <= 20; providerPage++) {
+          const result = await provider.listRepositories(
+            token,
+            { page: providerPage, perPage: 100 },
+            baseUrl,
+          );
           all.push(...result.repositories);
           if (!result.hasMore) break;
         }
-        const matched = all.filter((repo) =>
-          repo.fullName.toLowerCase().includes(search),
-        );
+        const matched = all.filter((repo) => repo.fullName.toLowerCase().includes(search));
         const start = (query.page - 1) * query.perPage;
         repositories = matched.slice(start, start + query.perPage);
         hasMore = start + query.perPage < matched.length;
       } else {
-        const result = await githubProvider.listRepositories(token, {
-          page: query.page,
-          perPage: query.perPage,
-        });
+        const result = await provider.listRepositories(
+          token,
+          { page: query.page, perPage: query.perPage },
+          baseUrl,
+        );
         repositories = result.repositories;
         hasMore = result.hasMore;
       }
@@ -149,6 +249,7 @@ export function registerGithubRoutes(app: FastifyInstance): void {
       db
         .select({ providerRepoId: projects.providerRepoId })
         .from(projects)
+        .where(inArray(projects.gitAccountId, [account.id]))
         .all()
         .map((row) => row.providerRepoId),
     );
@@ -173,22 +274,25 @@ export function registerGithubRoutes(app: FastifyInstance): void {
     async (request, reply) => {
       requireAuth(request);
       requireSameOrigin(request);
-      const account = getGitAccount();
-      if (!account) throw notFound('No GitHub account connected');
-
-      const { repositoryIds } = importSchema.parse(request.body);
+      const { gitAccountId, repositoryIds } = importSchema.parse(request.body);
+      const account = requireAccount(gitAccountId);
+      if (!isProviderId(account.provider)) {
+        throw new AppError(500, 'INTERNAL_ERROR', 'Unknown provider on stored account');
+      }
+      const provider = getProvider(account.provider);
       const token = getAccountToken(account);
+      const baseUrl = account.baseUrl ?? undefined;
 
       // Resolve the selected ids against the account's repositories, so a
       // client cannot import a repository this token has no access to.
       const wanted = new Set(repositoryIds);
-      const found = new Map<string, Awaited<ReturnType<typeof githubProvider.listRepositories>>['repositories'][number]>();
+      const found = new Map<
+        string,
+        Awaited<ReturnType<typeof provider.listRepositories>>['repositories'][number]
+      >();
       try {
         for (let page = 1; page <= 20 && found.size < wanted.size; page++) {
-          const result = await githubProvider.listRepositories(token, {
-            page,
-            perPage: 100,
-          });
+          const result = await provider.listRepositories(token, { page, perPage: 100 }, baseUrl);
           for (const repo of result.repositories) {
             if (wanted.has(repo.providerRepoId)) found.set(repo.providerRepoId, repo);
           }

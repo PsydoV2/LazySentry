@@ -28,7 +28,11 @@ export const settings = sqliteTable('settings', {
 
 export const gitAccounts = sqliteTable('git_accounts', {
   id: integer('id').primaryKey({ autoIncrement: true }),
-  provider: text('provider').notNull(), // 'github' only in the MVP
+  provider: text('provider').notNull(), // 'github' | 'gitlab'
+  // Null means the provider's public SaaS instance (github.com / gitlab.com);
+  // set for a self-hosted GitLab instance. Multiple accounts — including
+  // several for the same provider — are supported side by side.
+  baseUrl: text('base_url'),
   username: text('username').notNull(),
   tokenEncrypted: text('token_encrypted').notNull(),
   tokenScopes: text('token_scopes', { mode: 'json' }).$type<string[]>(),
