@@ -2,8 +2,10 @@ name: Publish Docker image
 
 # Builds the image (docs/CONCEPT.md 0.2, 3.2) and pushes it to GHCR so
 # `docker-compose.yml` can be used standalone — no repo checkout needed
-# (README.md "Getting started (Docker)"). Runs the test suite first so a
-# broken main branch never gets tagged `latest`.
+# (README.md "Getting started (Docker)"). The `test` job runs on every push
+# to main as plain CI; the `publish` job — the actual multi-arch Docker
+# build — only runs on a `vX.Y.Z` release tag (release.sh/release.ps1),
+# not on every commit to main.
 
 on:
   push:
@@ -32,6 +34,9 @@ jobs:
 
   publish:
     needs: test
+    # Only a release tag builds and pushes the image — a plain push to main
+    # just ran the test job above and stops there.
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -52,7 +57,7 @@ jobs:
           # but OCI image references must be lowercase.
           images: ghcr.io/${{ github.repository }}
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
 
@@ -64,8 +69,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           # Baked into the image so a running instance can compare itself
-          # against GitHub's tags (in-app update notice) — "latest" on a
-          # plain main-branch push, the real vX.Y.Z on a tag push.
+          # against GitHub's tags (in-app update notice).
           build-args: APP_VERSION=${{ steps.meta.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
