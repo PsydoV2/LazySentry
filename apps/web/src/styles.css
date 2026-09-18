@@ -95,8 +95,8 @@
     --warning-border: #5c4a1f;
     --warning-bg: #241f0d;
     --warning-text: #f3d478;
-    --info-border: #2c4a63;
-    --info-text: #7fd0ff;
+    --info-border: #45396e;
+    --info-text: #c9b8ff;
 
     --shadow-float: 0 8px 28px rgb(0 0 0 / 45%);
     --backdrop: rgb(0 0 0 / 55%);
@@ -131,8 +131,8 @@
   --warning-border: #5c4a1f;
   --warning-bg: #241f0d;
   --warning-text: #f3d478;
-  --info-border: #2c4a63;
-  --info-text: #7fd0ff;
+  --info-border: #45396e;
+  --info-text: #c9b8ff;
 
   --shadow-float: 0 8px 28px rgb(0 0 0 / 45%);
   --backdrop: rgb(0 0 0 / 55%);
@@ -496,15 +496,7 @@ button:disabled {
   background: var(--bg);
 }
 
-.empty-state {
-  padding: var(--space-7) var(--space-5);
-  text-align: center;
-  border: 1px dashed var(--border-strong);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-}
-
-/* Lighter-weight than .empty-state above (no dashed box — a tab inside the
+/* Lighter-weight than a bordered box (no dashed frame — a tab inside the
    modal is already a bordered surface, it doesn't need a second one nested
    in it): a neutral icon chip plus one line of text, for "nothing here yet"
    inside a single tab. */
@@ -529,6 +521,25 @@ button:disabled {
   width: 132px;
   height: 132px;
   stroke-width: 1.2;
+}
+
+/* The dashboard's empty state has no CTA of its own (Import lives in the
+   header), so it gets more visual weight than the icon used inside a
+   project tab. */
+.dashboard-empty-state-icon svg {
+  width: 198px;
+  height: 198px;
+}
+
+.dashboard-empty-state {
+  gap: var(--space-1);
+}
+
+.tab-empty-state-text.dashboard-empty-state-text {
+  color: var(--border-strong);
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
 }
 
 .tab-loading-spinner {

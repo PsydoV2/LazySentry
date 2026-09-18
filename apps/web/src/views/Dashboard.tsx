@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ImportDialog } from '../components/ImportDialog';
 import { ProjectCard } from '../components/ProjectCard';
-import { IconPlus } from '../components/icons';
+import { IconFolder, IconPlus } from '../components/icons';
 import { api, type Project } from '../lib/api';
 import { sortByUrgency } from '../lib/card-state';
 import { useScanEvents } from '../lib/events';
@@ -73,18 +73,13 @@ export function Dashboard({
       {projects.isLoading && <p className="muted">Loading…</p>}
 
       {sorted?.length === 0 && (
-        <div className="empty-state stack">
-          <h2>No projects yet</h2>
-          <p className="muted">Import your first repository to get started.</p>
-          <div>
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => setImporting(true)}
-            >
-              Import project
-            </button>
-          </div>
+        <div className="tab-empty-state dashboard-empty-state">
+          <span className="tab-empty-state-icon dashboard-empty-state-icon" aria-hidden="true">
+            <IconFolder />
+          </span>
+          <p className="tab-empty-state-text dashboard-empty-state-text muted">
+            No projects yet. Import your first repository to get started.
+          </p>
         </div>
       )}
 

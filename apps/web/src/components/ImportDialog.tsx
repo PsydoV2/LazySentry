@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EmptyState } from './EmptyState';
 import { LoadingState } from './LoadingState';
-import { IconChevronLeft, IconChevronRight, IconGithub } from './icons';
+import { IconChevronLeft, IconChevronRight, IconGithub, IconX } from './icons';
 import { api, ApiError, type GitAccountsList, type RepositoryPage } from '../lib/api';
 
 export function ImportDialog({ onClose }: { onClose: () => void }) {
@@ -77,7 +77,12 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
     >
       <div className="dialog" role="dialog" aria-modal="true" aria-label="Import projects">
         <div className="dialog-header stack">
-          <h2>Import repositories</h2>
+          <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <h2>Import repositories</h2>
+            <button type="button" className="icon-btn" aria-label="Close" onClick={onClose}>
+              <IconX />
+            </button>
+          </div>
 
           {hasMultipleAccounts && (
             <select
@@ -169,18 +174,13 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
             <span className="subtle">
               {selected.size > 0 ? `${selected.size} selected` : ''}
             </span>
-            <button type="button" className="btn-secondary" onClick={onClose}>
-              Cancel
-            </button>
             <button
               type="button"
               className="btn-primary"
               disabled={selected.size === 0 || importRepositories.isPending}
               onClick={() => importRepositories.mutate()}
             >
-              {importRepositories.isPending
-                ? 'Importing…'
-                : `Import${selected.size > 0 ? ` ${selected.size}` : ''}`}
+              {importRepositories.isPending ? 'Importing…' : 'Import'}
             </button>
           </div>
 
