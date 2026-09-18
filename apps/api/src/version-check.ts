@@ -3,25 +3,16 @@
 // exists. Checks the project's public GitHub tags for the newest vX.Y.Z,
 // cached in memory so every dashboard load doesn't hit GitHub. Never throws —
 // a failed check just means no notice, not a broken app.
+//
+// Uses the `semver` package rather than hand-rolled parsing, same reasoning
+// as lib/semver.ts: version strings are full of edge cases a naive
+// comparison gets wrong silently.
+
+import semver from 'semver';
 
 const REPO = 'PsydoV2/LazySentry';
 const CACHE_TTL_MS = 60 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 5_000;
-
-type Version = readonly [number, number, number];
-
-function parseVersion(raw: string): Version | null {
-  const match = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(raw.trim());
-  if (!match) return null;
-  return [Number(match[1]), Number(match[2]), Number(match[3])];
-}
-
-function compareVersions(a: Version, b: Version): number {
-  for (let i = 0; i < 3; i++) {
-    if (a[i] !== b[i]) return a[i]! - b[i]!;
-  }
-  return 0;
-}
 
 async function fetchLatestTag(): Promise<string | null> {
   let response: Response;
@@ -38,17 +29,17 @@ async function fetchLatestTag(): Promise<string | null> {
   const body: unknown = await response.json().catch(() => null);
   if (!Array.isArray(body)) return null;
 
-  let latest: { raw: string; parsed: Version } | null = null;
+  let latest: string | null = null;
   for (const entry of body) {
     const name = (entry as { name?: unknown } | null)?.name;
-    if (typeof name !== 'string') continue;
-    const parsed = parseVersion(name);
-    if (!parsed) continue;
-    if (!latest || compareVersions(parsed, latest.parsed) > 0) {
-      latest = { raw: name, parsed };
+    // Prereleases (v2.0.0-rc1) are valid semver but never something to
+    // nudge a self-hoster toward — only stable tags count as "latest".
+    if (typeof name !== 'string' || !semver.valid(name) || semver.prerelease(name)) {
+      continue;
     }
+    if (!latest || semver.gt(name, latest)) latest = name;
   }
-  return latest?.raw ?? null;
+  return latest;
 }
 
 export interface VersionCheckResult {
@@ -70,12 +61,10 @@ export async function checkForUpdate(currentVersion: string): Promise<VersionChe
     cache = { latest: await fetchLatestTag(), fetchedAt: now };
   }
 
-  const current = parseVersion(currentVersion);
-  const latestParsed = cache.latest ? parseVersion(cache.latest) : null;
   const updateAvailable =
-    current !== null &&
-    latestParsed !== null &&
-    compareVersions(latestParsed, current) > 0;
+    semver.valid(currentVersion) !== null &&
+    cache.latest !== null &&
+    semver.gt(cache.latest, currentVersion);
 
   return { current: currentVersion, latest: cache.latest, updateAvailable };
 }
