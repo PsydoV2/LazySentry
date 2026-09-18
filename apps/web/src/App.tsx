@@ -96,7 +96,10 @@ export function App() {
         />
       )}
       {route.name === 'settings' && (
-        <Settings onClose={() => navigate({ name: 'dashboard' })} />
+        <Settings
+          currentUser={session.data}
+          onClose={() => navigate({ name: 'dashboard' })}
+        />
       )}
     </>
   );

@@ -90,7 +90,7 @@ Ein vollständig selbsthostbares Security- und Wartungs-Dashboard für einzelne 
 
 Diese Punkte waren für das MVP selbst bewusst ausgeschlossen. Agents sollen sie ohne Freigabe laut 2.5 **nicht** vorwegnehmen, auch nicht „schon mal vorbereiten":
 
-- Mehrbenutzerbetrieb, Rollen, Teams
+- Mehrbenutzerbetrieb, Rollen, Teams — **teilweise freigegeben (Mehrbenutzerbetrieb + Rollen), siehe 2.6.** Echte Teams/Projekt-Gruppen bleiben Nicht-Ziel.
 - Webhooks, Tunneling, Event-getriebene Scans
 - KI-Features jeglicher Art
 - License-Compliance — **teilweise freigegeben, siehe 2.5**
@@ -132,6 +132,17 @@ Das MVP (Phase 1–2 aus Abschnitt 10) ist fertiggestellt. Der Projektinhaber ha
 - Neues Feld `packages.license` (Rohwert, z. B. SPDX-Ausdruck oder `unknown`, wenn die Registry nichts liefert oder der Ausdruck nicht geparst werden kann — nicht raten).
 - Anzeige in der Dependencies-Tabelle (8.2) als zusätzliche Spalte, kein eigener Severity-artiger Zustand.
 - **Ausdrücklich nicht Teil dieser Freigabe** (bleiben eigene, künftig einzeln zu entscheidende Nicht-Ziele): Allow-/Denylist-Policy, automatische Copyleft/Permissive-Klassifizierung samt Warn-UI, SBOM-Export (weiterhin Phase 6, siehe 2.3).
+
+### 2.6 Mehrbenutzerbetrieb, Rollen (freigegeben, 2026-09-18)
+
+Ursprünglich Teil von 2.2, auf Wunsch des Projektinhabers freigegeben — bewusst mit reduziertem Scope, kein echtes Team-Konzept:
+
+- **Mehrere benannte Nutzer-Accounts** auf derselben Instanz statt genau einem Admin. Kein Self-Signup: neue Nutzer werden ausschließlich von einem `admin` in den Settings angelegt (Username + initiales Passwort), analog zum bisherigen Setup-Wizard-Flow, aber ohne dessen einmalige Sperre — die Sperre gilt weiterhin nur für den allerersten Account.
+- **Zwei Rollen: `admin`, `member`.** `admin` darf zusätzlich zu allem, was `member` darf: Git-Accounts verbinden/reconnecten/löschen, Nutzer anlegen/deaktivieren/Rolle ändern. `member` darf: Projekte importieren/ansehen/löschen, Scans auslösen/ansehen, Findings einsehen/suppressen, Projekt-Settings ändern, Notification-/Schedule-Settings ändern — alles außer Git-Account- und Nutzerverwaltung.
+- **Kein Team-Konzept.** Alle Nutzer teilen sich eine Instanz und sehen dieselben Projekte und Git-Accounts — keine Team-Tabelle, keine projektbezogene Zugriffs-Isolation. „Teams" im Sinne von getrennten Arbeitsbereichen bleibt Nicht-Ziel.
+- **Git-Accounts bleiben instanzweit geteilt**, nicht user-gebunden — unverändert zu 2.4, nur die Verwaltung wird auf `admin` beschränkt.
+- Threat Model (6.1) wird entsprechend präzisiert: die Trust-Boundary zwischen Worker und fremdem Repo-Inhalt ändert sich nicht; es gibt weiterhin keine Multi-Tenant-Isolation zu bauen, nur mehrere vertrauenswürdige Nutzer _einer_ Organisation statt eines einzelnen.
+- **Ausdrücklich nicht Teil dieser Freigabe:** echte Teams/Projekt-Gruppen, feingranulare Permissions über die zwei Rollen hinaus, Invite-per-E-Mail (Nutzer werden synchron vom Admin angelegt, kein Mail-Versand), Audit-Log (bleibt 6.3).
 
 ---
 
@@ -202,6 +213,11 @@ Client-seitiges Polling würde bedeuten: jeder offene Browser-Tab fragt eigenst�
 ## 4. Datenmodell
 
 ```
+users
+  id, username, password_hash, role ('admin'|'member'), created_at, last_login_at
+  -- mehrere Accounts, keine Team-Zuordnung (2.6): admin verwaltet Git-Accounts
+  -- und Nutzer, member alles andere
+
 settings
   key, value_encrypted, is_secret
 
@@ -365,7 +381,7 @@ Weitere zu behandelnde Fälle: Clone-Fehler (Token abgelaufen, Repo gelöscht, R
 
 ### 6.1 Threat Model
 
-**Was kein Thema ist:** Jede Instanz läuft auf dem eigenen Server des Nutzers, ein einziger Admin-Account, Import nur von Repos, auf die der verbundene GitHub-Account Zugriff hat. Es gibt keine Multi-Tenant-Isolation zu bauen — ein Nutzer kann über dieses Tool nicht den Server eines anderen Nutzers angreifen, weil es keine geteilte Infrastruktur gibt.
+**Was kein Thema ist:** Jede Instanz läuft auf dem eigenen Server des Nutzers, mehrere Nutzer-Accounts einer Organisation statt eines einzelnen (2.6), Import nur von Repos, auf die ein verbundener Git-Account Zugriff hat. Es gibt keine Multi-Tenant-Isolation zu bauen — die Nutzer einer Instanz vertrauen sich gegenseitig (zwei Rollen, `admin`/`member`, regeln nur Git-Account- und Nutzerverwaltung, keine Datentrennung), und ein Nutzer einer Instanz kann über dieses Tool nicht den Server einer anderen Instanz angreifen, weil es keine geteilte Infrastruktur gibt.
 
 **Was sehr wohl ein Thema ist:** „eigenes Repo" heißt nicht „nur eigener Code". Jedes gescannte Repository zieht über seine Lockfiles hunderte fremde Dependencies, und dessen Git-Historie kann Inhalte von Kollegen, Pull Requests oder Forks enthalten. Kompromittierte npm- oder Packagist-Pakete sind real vorgekommen (`event-stream`, `ua-parser-js`, u. a.), und es gab reale CVEs, bei denen ein präpariertes Repo beim reinen `git clone` Code auf dem klonenden Rechner ausführen konnte.
 
@@ -398,6 +414,8 @@ Der Setup-Wizard beim ersten Aufruf ist auf das Nötigste reduziert:
 
 1. **Create admin account** — Username, Passwort, Passwortbestätigung.
 2. **Connect GitHub** — PAT eingeben, Validierung gegen `/user`, Anzeige des erkannten Accounts und der Scopes.
+
+Der erste angelegte Account bekommt automatisch die Rolle `admin`. Weitere Nutzer (2.6) werden nicht über den Wizard angelegt, sondern von einem `admin` unter Settings → Users (Username + initiales Passwort, Rolle `admin` oder `member`).
 
 Alles andere (Notifications, KI, weitere Provider) wandert in die Settings und ist optional. Ein Setup-Wizard mit sieben Abschnitten führt dazu, dass Leute das Tool wieder löschen, bevor sie es gesehen haben.
 

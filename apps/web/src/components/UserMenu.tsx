@@ -66,7 +66,10 @@ export function UserMenu({
 
       {open && (
         <div className="user-menu-dropdown" role="menu">
-          <div className="user-menu-name">{user.username}</div>
+          <div className="user-menu-name">
+            {user.username}
+            <span className="subtle"> · {user.role}</span>
+          </div>
           <hr className="divider" style={{ margin: '6px 0' }} />
 
           <div className="user-menu-theme">

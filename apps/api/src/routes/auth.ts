@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireSameOrigin } from '../auth/session.js';
-import { verifyCredentials } from '../auth/users.js';
+import { getUserById, verifyCredentials } from '../auth/users.js';
 import { unauthorized } from '../lib/errors.js';
 
 const loginSchema = z.object({
@@ -28,7 +28,7 @@ export function registerAuthRoutes(app: FastifyInstance): void {
       await request.session.regenerate();
       request.session.userId = user.id;
       request.session.username = user.username;
-      return reply.send({ id: user.id, username: user.username });
+      return reply.send({ id: user.id, username: user.username, role: user.role });
     },
   );
 
@@ -40,9 +40,10 @@ export function registerAuthRoutes(app: FastifyInstance): void {
 
   app.get('/api/auth/me', async (request) => {
     if (request.session.userId === undefined) throw unauthorized();
-    return {
-      id: request.session.userId,
-      username: request.session.username,
-    };
+    // Read fresh rather than trusting the session: a role change or account
+    // deletion must be visible on the very next request.
+    const user = getUserById(request.session.userId);
+    if (!user) throw unauthorized();
+    return { id: user.id, username: user.username, role: user.role };
   });
 }

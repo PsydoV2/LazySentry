@@ -5,6 +5,7 @@ import session from '@fastify/session';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { config } from '../config.js';
 import { forbidden, unauthorized } from '../lib/errors.js';
+import { getUserById, type Role } from './users.js';
 
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -36,6 +37,19 @@ export function requireAuth(request: FastifyRequest): number {
   const userId = request.session.userId;
   if (userId === undefined) throw unauthorized();
   return userId;
+}
+
+/**
+ * Admin-only guard (docs/CONCEPT.md 2.6: git-account and user management).
+ * Re-reads the role from the database on every call rather than trusting a
+ * value cached in the session cookie, so a role change (or account deletion)
+ * takes effect immediately instead of only after the affected user's next
+ * login.
+ */
+export function requireRole(request: FastifyRequest, role: Role): void {
+  const userId = requireAuth(request);
+  const user = getUserById(userId);
+  if (!user || user.role !== role) throw forbidden();
 }
 
 /**

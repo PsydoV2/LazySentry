@@ -72,9 +72,41 @@ export interface SetupStatus {
   complete: boolean;
 }
 
+/** Admin manages git accounts and users; member does everything else
+ * (docs/CONCEPT.md 2.6). No team/project-level isolation between them. */
+export type UserRole = 'admin' | 'member';
+
 export interface CurrentUser {
   id: number;
   username: string;
+  role: UserRole;
+}
+
+// ---- users (docs/CONCEPT.md 2.6) ----
+
+export interface AppUser {
+  id: number;
+  username: string;
+  role: UserRole;
+  createdAt: number;
+  lastLoginAt: number | null;
+}
+
+/** GET /api/users — admin only. */
+export interface UsersList {
+  users: AppUser[];
+}
+
+/** POST /api/users — admin only, no self-signup. */
+export interface CreateUserInput {
+  username: string;
+  password: string;
+  role: UserRole;
+}
+
+/** PATCH /api/users/:id — admin only. */
+export interface UpdateUserRoleInput {
+  role: UserRole;
 }
 
 /** Provider ids implemented today; the interface behind them stays abstract

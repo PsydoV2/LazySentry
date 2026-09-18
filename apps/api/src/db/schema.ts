@@ -11,11 +11,17 @@ import {
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core';
 
-/** Single admin account (docs/CONCEPT.md 6.1: no multi-user in the MVP). */
+/**
+ * Multiple named accounts sharing one instance, no team isolation
+ * (docs/CONCEPT.md 2.6). The first account created (setup wizard) is always
+ * 'admin'; further accounts are created by an admin in Settings.
+ */
 export const users = sqliteTable('users', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   username: text('username').notNull().unique(),
   passwordHash: text('password_hash').notNull(),
+  // 'admin' | 'member' — admin additionally manages git accounts and users.
+  role: text('role').notNull().default('member'),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   lastLoginAt: integer('last_login_at', { mode: 'timestamp_ms' }),
 });

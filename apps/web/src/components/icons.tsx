@@ -156,6 +156,17 @@ export function IconUser(props: IconProps) {
   );
 }
 
+export function IconUsers(props: IconProps) {
+  return (
+    <svg {...base(props)} strokeWidth={0} fill="currentColor" viewBox="0 0 24 24">
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M2.5 20.5a6.5 6.5 0 0 1 13 0Z" />
+      <circle cx="17" cy="9" r="2.8" opacity={0.6} />
+      <path d="M15.8 12.6a5.3 5.3 0 0 1 5.7 5.3v1.1h-4" opacity={0.6} />
+    </svg>
+  );
+}
+
 export function IconSettings(props: IconProps) {
   return (
     <svg {...base(props)}>

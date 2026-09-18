@@ -17,7 +17,7 @@ import {
   reconnectGitAccount,
   toPublicAccount,
 } from '../accounts/git-accounts.js';
-import { requireAuth, requireSameOrigin } from '../auth/session.js';
+import { requireAuth, requireRole, requireSameOrigin } from '../auth/session.js';
 import { db } from '../db/client.js';
 import { projects } from '../db/schema.js';
 import { AppError, badRequest, conflict, notFound } from '../lib/errors.js';
@@ -75,13 +75,14 @@ function requireAccount(id: number) {
 export function registerGitAccountRoutes(app: FastifyInstance): void {
   /**
    * Connecting is allowed during setup, before a session exists — but only
-   * while there is no admin account yet, i.e. inside the wizard. Afterwards
-   * it requires a login like every other state-changing endpoint.
+   * while there is no account yet, i.e. inside the wizard. Afterwards it
+   * requires an admin login (docs/CONCEPT.md 2.6: git-account management is
+   * admin-only, unlike most other state-changing endpoints).
    */
-  function requireSetupOrAuth(request: Parameters<typeof requireAuth>[0]): void {
+  function requireSetupOrAdmin(request: Parameters<typeof requireAuth>[0]): void {
     requireSameOrigin(request);
-    if (adminAccountExists() && request.session.userId === undefined) {
-      requireAuth(request);
+    if (adminAccountExists()) {
+      requireRole(request, 'admin');
     }
   }
 
@@ -98,7 +99,7 @@ export function registerGitAccountRoutes(app: FastifyInstance): void {
     '/api/git-accounts',
     { config: { rateLimit: { max: 10, timeWindow: '5 minutes' } } },
     async (request, reply) => {
-      requireSetupOrAuth(request);
+      requireSetupOrAdmin(request);
       const input = connectSchema.parse(request.body);
       const provider = getProvider(input.provider);
 
@@ -144,7 +145,7 @@ export function registerGitAccountRoutes(app: FastifyInstance): void {
     '/api/git-accounts/:id/reconnect',
     { config: { rateLimit: { max: 10, timeWindow: '5 minutes' } } },
     async (request, reply) => {
-      requireAuth(request);
+      requireRole(request, 'admin');
       requireSameOrigin(request);
       const { id } = z.object({ id: z.coerce.number().int() }).parse(request.params);
       const account = requireAccount(id);
@@ -173,7 +174,7 @@ export function registerGitAccountRoutes(app: FastifyInstance): void {
   );
 
   app.delete('/api/git-accounts/:id', async (request, reply) => {
-    requireAuth(request);
+    requireRole(request, 'admin');
     requireSameOrigin(request);
     const { id } = z.object({ id: z.coerce.number().int() }).parse(request.params);
     requireAccount(id);

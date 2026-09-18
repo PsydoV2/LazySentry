@@ -59,7 +59,9 @@ export const api = {
 export type {
   AppSettings,
   AppSettingsUpdate,
+  AppUser,
   ConnectResult,
+  CreateUserInput,
   CurrentUser,
   FindingStatus,
   GitAccount,
@@ -89,6 +91,9 @@ export type {
   Severity,
   SuppressionUpdate,
   UpdateType,
+  UpdateUserRoleInput,
+  UserRole,
+  UsersList,
   VersionInfo,
   Vulnerability,
 } from '@lazysentry/shared';

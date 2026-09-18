@@ -23,6 +23,7 @@ import { registerProjectRoutes } from './routes/projects.js';
 import { registerSectionRoutes } from './routes/sections.js';
 import { registerSettingsRoutes } from './routes/settings.js';
 import { registerSetupRoutes } from './routes/setup.js';
+import { registerUserRoutes } from './routes/users.js';
 import { registerVersionRoutes } from './routes/version.js';
 
 export async function startApi(): Promise<FastifyInstance> {
@@ -89,6 +90,7 @@ export async function startApi(): Promise<FastifyInstance> {
   registerProjectRoutes(app);
   registerSectionRoutes(app);
   registerSettingsRoutes(app);
+  registerUserRoutes(app);
   registerVersionRoutes(app);
 
   // Scan progress reaches the browser over SSE; the worker's status changes are

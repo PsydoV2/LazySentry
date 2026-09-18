@@ -71,6 +71,13 @@
       "when": 1789757768660,
       "tag": "0009_early_black_panther",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1789759411490,
+      "tag": "0010_flowery_thunderbolt",
+      "breakpoints": true
     }
   ]
 }
