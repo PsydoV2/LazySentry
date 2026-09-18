@@ -206,6 +206,7 @@ export function registerGitAccountRoutes(app: FastifyInstance): void {
 
     let repositories: Awaited<ReturnType<typeof provider.listRepositories>>['repositories'];
     let hasMore: boolean;
+    let totalPages: number | undefined;
     try {
       if (search) {
         // The provider's repo list has no server-side name filter, and the
@@ -228,6 +229,8 @@ export function registerGitAccountRoutes(app: FastifyInstance): void {
         const start = (query.page - 1) * query.perPage;
         repositories = matched.slice(start, start + query.perPage);
         hasMore = start + query.perPage < matched.length;
+        // Exact here — the fan-out above already pulled every match.
+        totalPages = Math.max(1, Math.ceil(matched.length / query.perPage));
       } else {
         const result = await provider.listRepositories(
           token,
@@ -236,6 +239,7 @@ export function registerGitAccountRoutes(app: FastifyInstance): void {
         );
         repositories = result.repositories;
         hasMore = result.hasMore;
+        totalPages = result.totalPages;
       }
       markAccountValid(account.id);
     } catch (error) {
@@ -261,6 +265,7 @@ export function registerGitAccountRoutes(app: FastifyInstance): void {
       })),
       page: query.page,
       hasMore,
+      totalPages,
     };
   });
 

@@ -29,6 +29,8 @@ export interface ProviderRepository {
 export interface RepositoryPage {
   repositories: ProviderRepository[];
   hasMore: boolean;
+  /** Exact total when the provider reports it; omitted otherwise. */
+  totalPages?: number;
 }
 
 export type ProviderId = 'github' | 'gitlab';

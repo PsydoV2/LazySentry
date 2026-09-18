@@ -7,8 +7,31 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EmptyState } from './EmptyState';
 import { LoadingState } from './LoadingState';
-import { IconChevronLeft, IconChevronRight, IconGithub, IconX } from './icons';
+import {
+  IconChevronLeft,
+  IconChevronRight,
+  IconGithub,
+  IconGitlab,
+  IconLock,
+  IconX,
+} from './icons';
 import { api, ApiError, type GitAccountsList, type RepositoryPage } from '../lib/api';
+
+// GitHub's usual per-language marker colors — decorative only, matches the
+// convention repo lists elsewhere use so a language is recognizable at a
+// glance instead of just named.
+const LANGUAGE_COLORS: Record<string, string> = {
+  TypeScript: '#3178c6',
+  JavaScript: '#f1e05a',
+  Python: '#3572a5',
+  Go: '#00add8',
+  Rust: '#dea584',
+  Java: '#b07219',
+  Ruby: '#701516',
+  'C#': '#178600',
+  PHP: '#4f5d95',
+  Swift: '#f05138',
+};
 
 export function ImportDialog({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
@@ -66,8 +89,6 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
     setSelected(new Set());
   }
 
-  const hasMultipleAccounts = (accounts.data?.accounts.length ?? 0) > 1;
-
   return (
     <div
       className="dialog-backdrop"
@@ -75,125 +96,157 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div className="dialog" role="dialog" aria-modal="true" aria-label="Import projects">
-        <div className="dialog-header stack">
-          <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <h2>Import repositories</h2>
-            <button type="button" className="icon-btn" aria-label="Close" onClick={onClose}>
-              <IconX />
-            </button>
-          </div>
-
-          {hasMultipleAccounts && (
-            <select
-              value={accountId ?? ''}
-              onChange={(event) => switchAccount(Number(event.target.value))}
-            >
-              {accounts.data!.accounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.provider === 'gitlab' ? 'GitLab' : 'GitHub'} · {account.username}
-                </option>
-              ))}
-            </select>
-          )}
-
-          <input
-            type="search"
-            value={search}
-            placeholder="Filter by name…"
-            onChange={(event) => {
-              setSearch(event.target.value);
-              setPage(1);
-            }}
-          />
+      <div className="dialog dialog-wide" role="dialog" aria-modal="true" aria-label="Import projects">
+        <div className="dialog-header">
+          <h2>Import repositories</h2>
+          <button type="button" className="icon-btn" aria-label="Close" onClick={onClose}>
+            <IconX />
+          </button>
         </div>
 
-        <div className="dialog-body">
-          {(accounts.isLoading || repositories.isLoading) && <LoadingState />}
-
-          {accounts.data && accounts.data.accounts.length === 0 && (
-            <EmptyState icon={IconGithub} message="No git account connected yet." />
-          )}
-
-          {repositories.isError && (
-            <p className="notice notice-error">
-              {repositories.error instanceof ApiError
-                ? repositories.error.message
-                : 'Could not load repositories'}
-            </p>
-          )}
-
-          {repositories.data && repositories.data.repositories.length === 0 && (
-            <EmptyState icon={IconGithub} message="No repositories match this filter." />
-          )}
-
-          {repositories.data && repositories.data.repositories.length > 0 && (
-            <div className="list">
-              {repositories.data.repositories.map((repo) => (
-                <label
-                  key={repo.providerRepoId}
-                  className={`list-row ${repo.imported ? 'is-disabled' : ''}`}
+        <div className="dialog-split">
+          {(accounts.data?.accounts.length ?? 0) > 0 && (
+            <div className="account-sidebar">
+              {accounts.data!.accounts.map((account) => (
+                <button
+                  key={account.id}
+                  type="button"
+                  className={`account-sidebar-item ${account.id === accountId ? 'is-active' : ''}`}
+                  onClick={() => switchAccount(account.id)}
                 >
-                  <input
-                    type="checkbox"
-                    disabled={repo.imported}
-                    checked={selected.has(repo.providerRepoId)}
-                    onChange={() => toggle(repo.providerRepoId)}
-                  />
-                  <span className="spread" style={{ flex: 1 }}>
-                    <span>
-                      {repo.fullName}
-                      {repo.isPrivate && (
-                        <span className="subtle"> · private</span>
-                      )}
-                      {repo.language && (
-                        <span className="subtle"> · {repo.language}</span>
-                      )}
-                    </span>
-                    {repo.imported && <span className="subtle">imported</span>}
+                  <span className="account-avatar" aria-hidden="true">
+                    {account.provider === 'gitlab' ? <IconGitlab /> : <IconGithub />}
                   </span>
-                </label>
+                  <span style={{ minWidth: 0 }}>
+                    <div className="account-name">{account.username}</div>
+                    <div className="account-provider">
+                      {account.provider === 'gitlab' ? 'GitLab' : 'GitHub'}
+                    </div>
+                  </span>
+                </button>
               ))}
             </div>
           )}
-        </div>
 
-        <div className="dialog-footer dialog-footer-paginated">
-          <button
-            type="button"
-            className="btn-secondary btn-icon-only"
-            title="Previous page"
-            aria-label="Previous page"
-            disabled={page === 1}
-            onClick={() => setPage((current) => current - 1)}
-          >
-            <IconChevronLeft />
-          </button>
+          <div className="dialog-main">
+            <div className="dialog-search">
+              <input
+                type="search"
+                value={search}
+                placeholder="Filter by name…"
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                  setPage(1);
+                }}
+              />
+            </div>
 
-          <div className="row" style={{ gap: 8 }}>
-            <span className="subtle">
-              {selected.size > 0 ? `${selected.size} selected` : ''}
-            </span>
-            <button
-              type="button"
-              className="btn-primary"
-              disabled={selected.size === 0 || importRepositories.isPending}
-              onClick={() => importRepositories.mutate()}
-            >
-              {importRepositories.isPending ? 'Importing…' : 'Import'}
-            </button>
+            <div className="dialog-body">
+              {(accounts.isLoading || repositories.isLoading) && <LoadingState />}
+
+              {accounts.data && accounts.data.accounts.length === 0 && (
+                <EmptyState icon={IconGithub} message="No git account connected yet." />
+              )}
+
+              {repositories.isError && (
+                <p className="notice notice-error">
+                  {repositories.error instanceof ApiError
+                    ? repositories.error.message
+                    : 'Could not load repositories'}
+                </p>
+              )}
+
+              {repositories.data && repositories.data.repositories.length === 0 && (
+                <EmptyState icon={IconGithub} message="No repositories match this filter." />
+              )}
+
+              {repositories.data && repositories.data.repositories.length > 0 && (
+                <div className="repo-list">
+                  {repositories.data.repositories.map((repo) => {
+                    const [owner, ...rest] = repo.fullName.split('/');
+                    const name = rest.join('/');
+                    const isSelected = selected.has(repo.providerRepoId);
+                    return (
+                      <label
+                        key={repo.providerRepoId}
+                        className={`repo-row ${isSelected ? 'is-selected' : ''} ${repo.imported ? 'is-disabled' : ''}`}
+                      >
+                        <input
+                          type="checkbox"
+                          disabled={repo.imported}
+                          checked={isSelected}
+                          onChange={() => toggle(repo.providerRepoId)}
+                        />
+                        <span className="repo-row-name">
+                          <span className="repo-row-owner">{owner}/</span>
+                          {name}
+                          {repo.isPrivate && (
+                            <IconLock className="repo-row-lock" width={12} height={12} />
+                          )}
+                        </span>
+                        <span style={{ flex: 1 }} />
+                        {repo.imported ? (
+                          <span className="subtle" style={{ fontSize: 11 }}>
+                            imported
+                          </span>
+                        ) : (
+                          repo.language && (
+                            <>
+                              <span
+                                className="lang-dot"
+                                style={{ background: LANGUAGE_COLORS[repo.language] ?? 'var(--text-subtle)' }}
+                              />
+                              <span className="repo-row-lang">{repo.language}</span>
+                            </>
+                          )
+                        )}
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="dialog-footer dialog-footer-paginated">
+              <div className="pager-text">
+                <button
+                  type="button"
+                  className="icon-btn"
+                  aria-label="Previous page"
+                  disabled={page === 1}
+                  onClick={() => setPage((current) => current - 1)}
+                >
+                  <IconChevronLeft />
+                </button>
+                <span>
+                  Page {page}
+                  {repositories.data?.totalPages ? ` of ${repositories.data.totalPages}` : ''}
+                </span>
+                <button
+                  type="button"
+                  className="icon-btn"
+                  aria-label="Next page"
+                  disabled={!repositories.data?.hasMore}
+                  onClick={() => setPage((current) => current + 1)}
+                >
+                  <IconChevronRight />
+                </button>
+              </div>
+
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={selected.size === 0 || importRepositories.isPending}
+                onClick={() => importRepositories.mutate()}
+              >
+                {importRepositories.isPending
+                  ? 'Importing…'
+                  : selected.size > 0
+                    ? `Import ${selected.size} repositor${selected.size === 1 ? 'y' : 'ies'}`
+                    : 'Import'}
+              </button>
+            </div>
           </div>
-
-          <button
-            type="button"
-            className="btn-secondary btn-icon-only"
-            title="Next page"
-            aria-label="Next page"
-            disabled={!repositories.data?.hasMore}
-            onClick={() => setPage((current) => current + 1)}
-          >
-            <IconChevronRight />
-          </button>
         </div>
       </div>
     </div>

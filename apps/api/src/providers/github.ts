@@ -95,6 +95,14 @@ function parseScopes(headers: Headers): {
   return { scopes, scopesUnknown: false };
 }
 
+/** Reads the `rel="last"` page number from a GitHub `Link` header, when present. */
+function parseLastPage(linkHeader: string | null): number | null {
+  if (!linkHeader) return null;
+  const last = linkHeader.split(',').find((part) => part.includes('rel="last"'));
+  const match = last?.match(/[?&]page=(\d+)/);
+  return match ? Number.parseInt(match[1]!, 10) : null;
+}
+
 function toRepository(repo: GitHubRepo): ProviderRepository {
   return {
     providerRepoId: String(repo.id),
@@ -145,13 +153,18 @@ export const githubProvider: GitProvider = {
       sort: 'updated',
       affiliation: 'owner,collaborator,organization_member',
     });
-    const { body } = await githubFetch(`/user/repos?${query}`, token);
+    const { body, headers } = await githubFetch(`/user/repos?${query}`, token);
     const repos = Array.isArray(body) ? (body as GitHubRepo[]) : [];
+    const lastPage = parseLastPage(headers.get('link'));
+    // No Link header and a partial page means this is the only/last page,
+    // so the current page number is the total.
+    const totalPages = lastPage ?? (repos.length < perPage ? page : undefined);
     return {
       repositories: repos.map(toRepository),
-      // A full page means there is probably another one; GitHub's Link
-      // header would be exact, but this is enough for a paginated picker.
-      hasMore: repos.length === perPage,
+      // The Link header is exact when GitHub sends one; fall back to "a
+      // full page probably means another one" only when it's absent.
+      hasMore: lastPage !== null ? page < lastPage : repos.length === perPage,
+      totalPages,
     };
   },
 };

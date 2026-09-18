@@ -155,9 +155,11 @@ export const gitlabProvider: GitProvider = {
     // GitLab reports exact pagination via headers, unlike GitHub's list
     // endpoint — use it when present instead of guessing from a full page.
     const nextPage = headers.get('x-next-page');
+    const totalPagesHeader = headers.get('x-total-pages');
     return {
       repositories: projects.map(toRepository),
       hasMore: nextPage !== null && nextPage !== '',
+      totalPages: totalPagesHeader ? Number.parseInt(totalPagesHeader, 10) : undefined,
     };
   },
 };

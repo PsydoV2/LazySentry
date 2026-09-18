@@ -141,6 +141,8 @@ export interface RepositoryPage {
   repositories: Repository[];
   page: number;
   hasMore: boolean;
+  /** Exact total when the provider (or the search fan-out) reports it. */
+  totalPages?: number;
 }
 
 export interface ImportResult {

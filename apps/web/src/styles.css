@@ -581,12 +581,22 @@ button:disabled {
   box-shadow: var(--shadow-float);
 }
 
+/* Wider variant for a dialog that splits into a sidebar + main pane
+   (ImportDialog's account switcher) instead of stacking everything. */
+.dialog-wide {
+  max-width: 760px;
+}
+
 .dialog-header,
 .dialog-footer {
   padding: var(--space-4) var(--space-5);
 }
 
 .dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
   border-bottom: 1px solid var(--border);
 }
 
@@ -609,6 +619,150 @@ button:disabled {
   min-height: 0;
   padding: var(--space-4) var(--space-5);
   overflow-y: auto;
+}
+
+/* ImportDialog's two-pane body: a fixed account sidebar plus a main pane
+   that owns its own search/list/footer, so switching accounts never
+   resizes the dialog around the user. */
+.dialog-split {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.account-sidebar {
+  width: 168px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+}
+
+.account-sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: left;
+  border: 0;
+  border-left: 2px solid transparent;
+  background: transparent;
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-2) var(--space-2) 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.account-sidebar-item:hover {
+  background: var(--bg);
+}
+
+.account-sidebar-item.is-active {
+  background: var(--accent-subtle);
+  border-left-color: var(--accent);
+}
+
+.account-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--border-strong);
+  color: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.account-avatar svg {
+  width: 12px;
+  height: 12px;
+}
+
+.account-name {
+  font-weight: 600;
+}
+
+.account-provider {
+  color: var(--text-subtle);
+  font-size: 10px;
+}
+
+.dialog-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.dialog-search {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+/* Repository rows: no outer box or dividers — a selected row is picked out
+   by its own tinted background instead, so scanning a long list stays
+   quiet until you've actually selected something. */
+.repo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.repo-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 9px var(--space-2);
+  border-radius: var(--radius);
+}
+
+.repo-row.is-selected {
+  background: var(--accent-subtle);
+}
+
+.repo-row.is-disabled {
+  color: var(--text-subtle);
+}
+
+.repo-row-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.repo-row-owner {
+  color: var(--text-subtle);
+}
+
+.repo-row-lock {
+  color: var(--text-subtle);
+  flex-shrink: 0;
+}
+
+.repo-row-lang {
+  font-size: 11px;
+  color: var(--text-subtle);
+}
+
+.lang-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.pager-text {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-subtle);
+  font-size: 13px;
 }
 
 /* ---------- fixed-size modal (project detail & settings) ----------
@@ -802,6 +956,9 @@ button:disabled {
 }
 
 .icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid transparent;
   background: transparent;
   color: var(--text-subtle);
