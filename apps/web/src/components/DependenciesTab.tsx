@@ -8,7 +8,7 @@ import { EmptyState } from './EmptyState';
 import { api, type PackageEntry, type Project, type Vulnerability } from '../lib/api';
 import { IconAlertTriangle, IconBug, IconChevronDown, IconFolder, IconPackage } from './icons';
 
-type SortKey = 'name' | 'ecosystem' | 'versionInstalled' | 'updateType';
+type SortKey = 'name' | 'ecosystem' | 'versionInstalled' | 'updateType' | 'vulnerabilities';
 
 const UPDATE_LABEL: Record<PackageEntry['updateType'], string> = {
   none: 'up to date',
@@ -39,6 +39,7 @@ export function DependenciesTab({ project }: { project: Project }) {
   const [search, setSearch] = useState('');
   const [ecosystem, setEcosystem] = useState('');
   const [directOnly, setDirectOnly] = useState(false);
+  const [vulnerableOnly, setVulnerableOnly] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [expanded, setExpanded] = useState<number | null>(null);
 
@@ -77,15 +78,21 @@ export function DependenciesTab({ project }: { project: Project }) {
       if (search && !pkg.name.toLowerCase().includes(search.toLowerCase())) {
         return false;
       }
+      if (vulnerableOnly && (vulnsByPackage.get(`${pkg.ecosystem}::${pkg.name}`)?.length ?? 0) === 0) {
+        return false;
+      }
       return true;
     });
     return [...filtered].sort((a, b) => {
       if (sortKey === 'updateType') {
         return updateRank(b.updateType) - updateRank(a.updateType);
       }
+      if (sortKey === 'vulnerabilities') {
+        return vulnRank(b, vulnsByPackage) - vulnRank(a, vulnsByPackage);
+      }
       return String(a[sortKey]).localeCompare(String(b[sortKey]));
     });
-  }, [packages.data, directOnly, ecosystem, search, sortKey]);
+  }, [packages.data, directOnly, ecosystem, search, vulnerableOnly, vulnsByPackage, sortKey]);
 
   if (packages.isLoading) return <p className="muted">Loading…</p>;
 
@@ -115,14 +122,28 @@ export function DependenciesTab({ project }: { project: Project }) {
     );
   }
 
-  const filtersActive = search !== '' || ecosystem !== '' || directOnly;
+  const filtersActive = search !== '' || ecosystem !== '' || directOnly || vulnerableOnly;
   const directCount = (packages.data ?? []).filter((pkg) => pkg.isDirect).length;
   const outdatedCount = (packages.data ?? []).filter(
     (pkg) => pkg.updateType !== 'none' && pkg.updateType !== 'unknown',
   ).length;
+  const vulnerablePackages = (packages.data ?? []).filter(
+    (pkg) => (vulnsByPackage.get(`${pkg.ecosystem}::${pkg.name}`)?.length ?? 0) > 0,
+  );
+  const criticalPackageCount = vulnerablePackages.filter(
+    (pkg) =>
+      highestSeverity(vulnsByPackage.get(`${pkg.ecosystem}::${pkg.name}`) ?? []) === 'critical',
+  ).length;
 
   return (
     <div className="stack">
+      {criticalPackageCount > 0 && (
+        <p className="notice notice-error">
+          {criticalPackageCount} package{criticalPackageCount === 1 ? '' : 's'} affected by a
+          critical vulnerability.
+        </p>
+      )}
+
       <div className="filter-bar">
         <input
           type="search"
@@ -131,14 +152,16 @@ export function DependenciesTab({ project }: { project: Project }) {
           onChange={(event) => setSearch(event.target.value)}
           style={{ maxWidth: 240 }}
         />
-        <select value={ecosystem} onChange={(event) => setEcosystem(event.target.value)}>
-          <option value="">All ecosystems</option>
-          {ecosystems.map((eco) => (
-            <option key={eco} value={eco}>
-              {eco}
-            </option>
-          ))}
-        </select>
+        {ecosystems.length > 1 && (
+          <select value={ecosystem} onChange={(event) => setEcosystem(event.target.value)}>
+            <option value="">All ecosystems</option>
+            {ecosystems.map((eco) => (
+              <option key={eco} value={eco}>
+                {eco}
+              </option>
+            ))}
+          </select>
+        )}
         <label className="row" style={{ gap: 6 }}>
           <input
             type="checkbox"
@@ -146,6 +169,14 @@ export function DependenciesTab({ project }: { project: Project }) {
             onChange={(event) => setDirectOnly(event.target.checked)}
           />
           Direct only
+        </label>
+        <label className="row" style={{ gap: 6 }}>
+          <input
+            type="checkbox"
+            checked={vulnerableOnly}
+            onChange={(event) => setVulnerableOnly(event.target.checked)}
+          />
+          Vulnerable only
         </label>
         {filtersActive && (
           <button
@@ -155,6 +186,7 @@ export function DependenciesTab({ project }: { project: Project }) {
               setSearch('');
               setEcosystem('');
               setDirectOnly(false);
+              setVulnerableOnly(false);
             }}
           >
             Clear filters
@@ -170,6 +202,7 @@ export function DependenciesTab({ project }: { project: Project }) {
           {' · '}
           {directCount} direct
           {outdatedCount > 0 ? ` · ${outdatedCount} need updates` : ''}
+          {vulnerablePackages.length > 0 ? ` · ${vulnerablePackages.length} vulnerable` : ''}
         </span>
       </div>
 
@@ -191,7 +224,11 @@ export function DependenciesTab({ project }: { project: Project }) {
               active={sortKey === 'updateType'}
               onClick={() => setSortKey('updateType')}
             />
-            <span>Vulnerabilities</span>
+            <SortableHeader
+              label="Vulnerabilities"
+              active={sortKey === 'vulnerabilities'}
+              onClick={() => setSortKey('vulnerabilities')}
+            />
           </div>
 
           {rows.map((pkg) => {
@@ -309,4 +346,20 @@ function highestSeverity(vulns: Vulnerability[]): Vulnerability['severity'] {
     if (vulns.some((vuln) => vuln.severity === severity)) return severity;
   }
   return 'unknown';
+}
+
+const SEVERITY_WEIGHT: Record<Vulnerability['severity'], number> = {
+  critical: 5,
+  high: 4,
+  medium: 3,
+  low: 2,
+  unknown: 1,
+};
+
+/** Worst severity first, then vulnerability count — so sorting the column
+ * surfaces the packages that most need attention. */
+function vulnRank(pkg: PackageEntry, vulnsByPackage: Map<string, Vulnerability[]>): number {
+  const vulns = vulnsByPackage.get(`${pkg.ecosystem}::${pkg.name}`) ?? [];
+  if (vulns.length === 0) return 0;
+  return SEVERITY_WEIGHT[highestSeverity(vulns)] * 1000 + vulns.length;
 }
