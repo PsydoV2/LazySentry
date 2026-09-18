@@ -37,6 +37,9 @@ const envSchema = z.object({
   // CSRF). Only needed when a reverse proxy rewrites the Host header;
   // otherwise Origin is checked against Host. Example: https://sentry.example.com
   APP_ORIGIN: z.string().url().optional(),
+  // Baked into the image at build time (Dockerfile, docker-publish.yml), not
+  // meant to be set by hand — drives the in-app update notice.
+  APP_VERSION: z.string().default('dev'),
 });
 
 const parsed = envSchema.safeParse(process.env);

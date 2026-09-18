@@ -67,10 +67,16 @@ COPY --from=build --chown=node:node /repo/apps/web/dist ./web/dist
 RUN mkdir -p /data && chown node:node /data
 VOLUME /data
 
+# Set by CI from the git tag/branch being built (docker-publish.yml) so the
+# running instance can compare itself against GitHub's tags — never set this
+# by hand, a stray value here just breaks the update notice, not the app.
+ARG APP_VERSION=dev
+
 ENV NODE_ENV=production \
     DATABASE_PATH=/data/lazysentry.db \
     HOST=0.0.0.0 \
-    PORT=3111
+    PORT=3111 \
+    APP_VERSION=$APP_VERSION
 
 WORKDIR /app/api
 USER node

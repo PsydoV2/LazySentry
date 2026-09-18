@@ -145,6 +145,14 @@ export interface RepositoryPage {
   totalPages?: number;
 }
 
+/** GET /api/version — the update notice (docs/CONCEPT.md is silent on this;
+ * self-hosted instances have no auto-update, so this is a manual-update hint). */
+export interface VersionInfo {
+  current: string;
+  latest: string | null;
+  updateAvailable: boolean;
+}
+
 export interface ImportResult {
   imported: { id: number; fullName: string }[];
   /** Full names skipped because they were already imported. */

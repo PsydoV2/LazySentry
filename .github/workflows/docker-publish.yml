@@ -63,5 +63,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # Baked into the image so a running instance can compare itself
+          # against GitHub's tags (in-app update notice) — "latest" on a
+          # plain main-branch push, the real vX.Y.Z on a tag push.
+          build-args: APP_VERSION=${{ steps.meta.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

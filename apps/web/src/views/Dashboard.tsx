@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ImportDialog } from '../components/ImportDialog';
 import { ProjectCard } from '../components/ProjectCard';
+import { UpdateBanner } from '../components/UpdateBanner';
 import { IconFolder, IconPlus } from '../components/icons';
 import { api, type Project } from '../lib/api';
 import { sortByUrgency } from '../lib/card-state';
@@ -51,6 +52,8 @@ export function Dashboard({
 
   return (
     <main className="page stack">
+      <UpdateBanner />
+
       <div className="dashboard-heading">
         <div>
           <h1>Projects</h1>

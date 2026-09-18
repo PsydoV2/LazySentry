@@ -81,5 +81,6 @@ export type {
   SetupStatus,
   Severity,
   UpdateType,
+  VersionInfo,
   Vulnerability,
 } from '@lazysentry/shared';

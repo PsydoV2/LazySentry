@@ -21,6 +21,7 @@ import { registerEventRoutes } from './routes/events.js';
 import { registerGitAccountRoutes } from './routes/git-accounts.js';
 import { registerProjectRoutes } from './routes/projects.js';
 import { registerSetupRoutes } from './routes/setup.js';
+import { registerVersionRoutes } from './routes/version.js';
 
 export async function startApi(): Promise<FastifyInstance> {
   runMigrations();
@@ -84,6 +85,7 @@ export async function startApi(): Promise<FastifyInstance> {
   registerAuthRoutes(app);
   registerGitAccountRoutes(app);
   registerProjectRoutes(app);
+  registerVersionRoutes(app);
 
   // Scan progress reaches the browser over SSE; the worker's status changes are
   // picked up by polling this process's own database (docs/CONCEPT.md 3.5).
