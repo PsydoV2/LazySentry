@@ -407,7 +407,7 @@ Diese Richtlinien gelten für alle Ansichten (Dashboard, Detailseite, Setup-Wiza
 
 - Header mit **Import project**-Button und globalem Zustand (`X projects · last scan 3 minutes ago`)
 - Projekt-Cards in einem responsiven Grid
-- Import-Dialog: listet die Repos des verbundenen Accounts (paginiert, durchsuchbar, GitHub-API `/user/repos`), Mehrfachauswahl möglich, bereits importierte Repos sind ausgegraut
+- Import-Dialog: listet die Repos des verbundenen Accounts (paginiert, durchsuchbar, GitHub-API `/user/repos`), Mehrfachauswahl möglich, bereits importierte Repos werden aus der Liste ausgeblendet
 - Beim Import wird sofort ein erster Scan eingereiht; die Card erscheint direkt im Zustand `scanning`
 
 **Card-Inhalt:**

@@ -204,51 +204,9 @@ export function registerGitAccountRoutes(app: FastifyInstance): void {
     const search = query.search?.toLowerCase();
     const baseUrl = account.baseUrl ?? undefined;
 
-    let repositories: Awaited<ReturnType<typeof provider.listRepositories>>['repositories'];
-    let hasMore: boolean;
-    let totalPages: number | undefined;
-    try {
-      if (search) {
-        // The provider's repo list has no server-side name filter, and the
-        // requested page is only one slice of the account's repositories —
-        // filtering just that slice would hide matches that happen to live
-        // on a different page. So when searching, pull every page first and
-        // filter across the full set, then paginate the filtered result
-        // ourselves.
-        const all: typeof repositories = [];
-        for (let providerPage = 1; providerPage <= 20; providerPage++) {
-          const result = await provider.listRepositories(
-            token,
-            { page: providerPage, perPage: 100 },
-            baseUrl,
-          );
-          all.push(...result.repositories);
-          if (!result.hasMore) break;
-        }
-        const matched = all.filter((repo) => repo.fullName.toLowerCase().includes(search));
-        const start = (query.page - 1) * query.perPage;
-        repositories = matched.slice(start, start + query.perPage);
-        hasMore = start + query.perPage < matched.length;
-        // Exact here — the fan-out above already pulled every match.
-        totalPages = Math.max(1, Math.ceil(matched.length / query.perPage));
-      } else {
-        const result = await provider.listRepositories(
-          token,
-          { page: query.page, perPage: query.perPage },
-          baseUrl,
-        );
-        repositories = result.repositories;
-        hasMore = result.hasMore;
-        totalPages = result.totalPages;
-      }
-      markAccountValid(account.id);
-    } catch (error) {
-      if (error instanceof ProviderAuthError) markAccountInvalid(account.id);
-      return toApiError(error);
-    }
-
-    // Already-imported repositories are marked rather than hidden, so the
-    // picker can grey them out (docs/CONCEPT.md 8.1).
+    // Already-imported repositories are excluded from the picker entirely
+    // rather than shown greyed out (docs/CONCEPT.md 8.1) — there is nothing
+    // left to do with them here.
     const importedIds = new Set(
       db
         .select({ providerRepoId: projects.providerRepoId })
@@ -258,11 +216,44 @@ export function registerGitAccountRoutes(app: FastifyInstance): void {
         .map((row) => row.providerRepoId),
     );
 
+    let repositories: Awaited<ReturnType<typeof provider.listRepositories>>['repositories'];
+    let hasMore: boolean;
+    let totalPages: number | undefined;
+    try {
+      // The provider's repo list has no server-side name filter and no way
+      // to exclude already-imported repos, and the requested page is only
+      // one slice of the account's repositories — filtering just that slice
+      // would hide matches that happen to live on a different page. So we
+      // always pull every page first and filter across the full set, then
+      // paginate the filtered result ourselves.
+      const all: typeof repositories = [];
+      for (let providerPage = 1; providerPage <= 20; providerPage++) {
+        const result = await provider.listRepositories(
+          token,
+          { page: providerPage, perPage: 100 },
+          baseUrl,
+        );
+        all.push(...result.repositories);
+        if (!result.hasMore) break;
+      }
+      const matched = all.filter(
+        (repo) =>
+          !importedIds.has(repo.providerRepoId) &&
+          (!search || repo.fullName.toLowerCase().includes(search)),
+      );
+      const start = (query.page - 1) * query.perPage;
+      repositories = matched.slice(start, start + query.perPage);
+      hasMore = start + query.perPage < matched.length;
+      // Exact here — the fan-out above already pulled every repository.
+      totalPages = Math.max(1, Math.ceil(matched.length / query.perPage));
+      markAccountValid(account.id);
+    } catch (error) {
+      if (error instanceof ProviderAuthError) markAccountInvalid(account.id);
+      return toApiError(error);
+    }
+
     return {
-      repositories: repositories.map((repo) => ({
-        ...repo,
-        imported: importedIds.has(repo.providerRepoId),
-      })),
+      repositories,
       page: query.page,
       hasMore,
       totalPages,

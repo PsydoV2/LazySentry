@@ -1,5 +1,5 @@
 // Repository picker (docs/CONCEPT.md 8.1): paginated, searchable, multi
-// select, already-imported repositories greyed out rather than hidden.
+// select, already-imported repositories excluded entirely rather than shown.
 // Repositories come from one connected account at a time — a selector
 // appears once more than one account is connected.
 
@@ -191,11 +191,10 @@ export function ImportDialog({
                     return (
                       <label
                         key={repo.providerRepoId}
-                        className={`repo-row ${isSelected ? 'is-selected' : ''} ${repo.imported ? 'is-disabled' : ''}`}
+                        className={`repo-row ${isSelected ? 'is-selected' : ''}`}
                       >
                         <input
                           type="checkbox"
-                          disabled={repo.imported}
                           checked={isSelected}
                           onChange={() => toggle(repo.providerRepoId)}
                         />
@@ -207,20 +206,14 @@ export function ImportDialog({
                           )}
                         </span>
                         <span style={{ flex: 1 }} />
-                        {repo.imported ? (
-                          <span className="subtle" style={{ fontSize: 11 }}>
-                            imported
-                          </span>
-                        ) : (
-                          repo.language && (
-                            <>
-                              <span
-                                className="lang-dot"
-                                style={{ background: LANGUAGE_COLORS[repo.language] ?? 'var(--text-subtle)' }}
-                              />
-                              <span className="repo-row-lang">{repo.language}</span>
-                            </>
-                          )
+                        {repo.language && (
+                          <>
+                            <span
+                              className="lang-dot"
+                              style={{ background: LANGUAGE_COLORS[repo.language] ?? 'var(--text-subtle)' }}
+                            />
+                            <span className="repo-row-lang">{repo.language}</span>
+                          </>
                         )}
                       </label>
                     );

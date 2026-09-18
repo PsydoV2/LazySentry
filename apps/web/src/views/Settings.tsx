@@ -118,6 +118,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
                 </>
               ) : (
                 <ConnectGitAccount
+                  key={addingProvider}
                   fixedProvider={addingProvider}
                   onConnected={(result) => {
                     setJustConnected(result);

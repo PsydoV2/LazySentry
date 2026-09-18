@@ -133,8 +133,6 @@ export interface Repository {
   isPrivate: boolean;
   language: string | null;
   updatedAt: string | null;
-  /** Already imported — greyed out rather than hidden (8.1). */
-  imported: boolean;
 }
 
 export interface RepositoryPage {
