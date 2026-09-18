@@ -258,3 +258,12 @@ export function IconFolder(props: IconProps) {
     </svg>
   );
 }
+
+export function IconTrash(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m2 0-.8 12.1a2 2 0 0 1-2 1.9H9.8a2 2 0 0 1-2-1.9L7 7" />
+      <path d="M10 11v6M14 11v6" />
+    </svg>
+  );
+}

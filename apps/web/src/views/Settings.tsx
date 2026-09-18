@@ -1,4 +1,4 @@
-// Instance settings (docs/CONCEPT.md 6.2 reconnect flow): connected git
+// Instance settings (docs/CONCEPT.md 6.2 reconnect flow): connected
 // accounts — several at once, across GitHub and GitLab.
 
 import { useState } from 'react';
@@ -8,7 +8,14 @@ import {
   ReconnectAccount,
   TokenScopeWarning,
 } from '../components/ConnectGitAccount';
-import { IconGithub, IconGitlab, IconKey, IconPlus } from '../components/icons';
+import {
+  IconGithub,
+  IconGitlab,
+  IconKey,
+  IconPlus,
+  IconTrash,
+  IconUser,
+} from '../components/icons';
 import { Modal } from '../components/Modal';
 import {
   api,
@@ -16,6 +23,8 @@ import {
   type ConnectResult,
   type GitAccount,
   type GitAccountsList,
+  type GitProviderId,
+  type ProvidersList,
 } from '../lib/api';
 import { relativeTime } from '../lib/format';
 
@@ -25,7 +34,7 @@ function ProviderIcon({ provider }: { provider: string }) {
 
 export function Settings({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
-  const [adding, setAdding] = useState(false);
+  const [addingProvider, setAddingProvider] = useState<GitProviderId | null>(null);
   const [justConnected, setJustConnected] = useState<ConnectResult | null>(null);
 
   const accounts = useQuery({
@@ -33,13 +42,23 @@ export function Settings({ onClose }: { onClose: () => void }) {
     queryFn: () => api.get<GitAccountsList>('/api/git-accounts'),
   });
 
+  const providers = useQuery({
+    queryKey: ['providers'],
+    queryFn: () => api.get<ProvidersList>('/api/providers'),
+  });
+
   function invalidateAccounts(): void {
     queryClient.invalidateQueries({ queryKey: ['git-accounts'] });
     queryClient.invalidateQueries({ queryKey: ['setup-status'] });
   }
 
+  function toggleAddProvider(id: GitProviderId): void {
+    setAddingProvider((current) => (current === id ? null : id));
+    setJustConnected(null);
+  }
+
   function closeAddForm(): void {
-    setAdding(false);
+    setAddingProvider(null);
     setJustConnected(null);
   }
 
@@ -51,20 +70,24 @@ export function Settings({ onClose }: { onClose: () => void }) {
     >
       <div className="stack">
         <div className="card stack">
-          <div className="row spread">
-            <div className="row">
-              <IconGithub />
-              <h2>Git accounts</h2>
-            </div>
-            {!adding && (
+          <div className="row">
+            <IconUser />
+            <h2>Accounts</h2>
+          </div>
+
+          <div className="row" style={{ gap: 8 }}>
+            {providers.data?.providers.map((provider) => (
               <button
+                key={provider.id}
                 type="button"
-                className="btn-secondary"
-                onClick={() => setAdding(true)}
+                className={`provider-add-btn ${addingProvider === provider.id ? 'is-active' : ''}`}
+                onClick={() => toggleAddProvider(provider.id)}
               >
-                <IconPlus /> Add account
+                <ProviderIcon provider={provider.id} />
+                {provider.label}
+                <IconPlus />
               </button>
-            )}
+            ))}
           </div>
 
           {accounts.isLoading && <p className="muted">Loading…</p>}
@@ -76,22 +99,15 @@ export function Settings({ onClose }: { onClose: () => void }) {
             </p>
           )}
 
-          {accounts.data && accounts.data.accounts.length === 0 && !adding && (
-            <>
-              <p className="subtle">No git account connected yet.</p>
-              <div>
-                <button type="button" className="btn-primary" onClick={() => setAdding(true)}>
-                  Connect an account
-                </button>
-              </div>
-            </>
+          {accounts.data && accounts.data.accounts.length === 0 && !addingProvider && (
+            <p className="subtle">No accounts connected yet.</p>
           )}
 
           {accounts.data?.accounts.map((account) => (
             <AccountRow key={account.id} account={account} onChanged={invalidateAccounts} />
           ))}
 
-          {adding && (
+          {addingProvider && (
             <div className="stack" style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--space-3)' }}>
               {justConnected ? (
                 <>
@@ -102,6 +118,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
                 </>
               ) : (
                 <ConnectGitAccount
+                  fixedProvider={addingProvider}
                   onConnected={(result) => {
                     setJustConnected(result);
                     invalidateAccounts();
@@ -171,17 +188,25 @@ function AccountRow({
           </span>
           <button
             type="button"
-            className="btn-secondary"
+            className="icon-btn"
+            title={account.status === 'valid' ? 'Replace token' : 'Reconnect'}
+            aria-label={account.status === 'valid' ? 'Replace token' : 'Reconnect'}
             onClick={() => {
               setReconnecting((current) => !current);
               setJustReconnected(null);
             }}
           >
-            {account.status === 'valid' ? 'Replace token' : 'Reconnect'}
+            <IconKey />
           </button>
           {!confirmingRemove ? (
-            <button type="button" className="btn-danger" onClick={() => setConfirmingRemove(true)}>
-              Remove
+            <button
+              type="button"
+              className="icon-btn icon-btn-danger"
+              title="Remove account"
+              aria-label="Remove account"
+              onClick={() => setConfirmingRemove(true)}
+            >
+              <IconTrash />
             </button>
           ) : (
             <>

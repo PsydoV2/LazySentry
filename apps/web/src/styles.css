@@ -665,6 +665,21 @@ button:disabled {
   border-left-color: var(--accent);
 }
 
+/* Always the last row — pinned to the bottom of the sidebar (even with
+   just one account) rather than mixed in among the real accounts, and
+   styled as an action (dashed chip, no name/provider lines) instead of a
+   selectable entry. */
+.account-sidebar-add {
+  margin-top: auto;
+  color: var(--text-subtle);
+}
+
+.account-sidebar-add .account-avatar {
+  background: transparent;
+  border: 1px dashed var(--border-strong);
+  color: var(--text-subtle);
+}
+
 .account-avatar {
   width: 20px;
   height: 20px;
@@ -970,6 +985,42 @@ button:disabled {
 .icon-btn:hover:not(:disabled) {
   background: var(--bg);
   color: var(--text);
+}
+
+.icon-btn-danger:hover:not(:disabled) {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+/* One rectangle per provider (Settings → Accounts): icon + label on the
+   left, a trailing plus — pressing it reveals that provider's own
+   credential form below instead of a generic "Add account" dialog with
+   its own provider dropdown. */
+.provider-add-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 8px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.provider-add-btn svg:last-child {
+  margin-left: var(--space-2);
+  color: var(--text-subtle);
+}
+
+.provider-add-btn:hover {
+  background: var(--bg);
+}
+
+.provider-add-btn.is-active {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
 }
 
 /* Top-right action group: settings shortcut and overflow menu sit next to

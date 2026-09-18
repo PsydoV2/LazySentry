@@ -13,9 +13,11 @@ import {
   IconGithub,
   IconGitlab,
   IconLock,
+  IconPlus,
   IconX,
 } from './icons';
 import { api, ApiError, type GitAccountsList, type RepositoryPage } from '../lib/api';
+import type { Route } from '../lib/router';
 
 // GitHub's usual per-language marker colors — decorative only, matches the
 // convention repo lists elsewhere use so a language is recognizable at a
@@ -33,7 +35,13 @@ const LANGUAGE_COLORS: Record<string, string> = {
   Swift: '#f05138',
 };
 
-export function ImportDialog({ onClose }: { onClose: () => void }) {
+export function ImportDialog({
+  onClose,
+  navigate,
+}: {
+  onClose: () => void;
+  navigate: (route: Route) => void;
+}) {
   const queryClient = useQueryClient();
   const [accountId, setAccountId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
@@ -105,9 +113,9 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="dialog-split">
-          {(accounts.data?.accounts.length ?? 0) > 0 && (
+          {accounts.data && (
             <div className="account-sidebar">
-              {accounts.data!.accounts.map((account) => (
+              {accounts.data.accounts.map((account) => (
                 <button
                   key={account.id}
                   type="button"
@@ -125,6 +133,20 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
                   </span>
                 </button>
               ))}
+
+              <button
+                type="button"
+                className="account-sidebar-item account-sidebar-add"
+                onClick={() => {
+                  onClose();
+                  navigate({ name: 'settings' });
+                }}
+              >
+                <span className="account-avatar" aria-hidden="true">
+                  <IconPlus />
+                </span>
+                Add account
+              </button>
             </div>
           )}
 

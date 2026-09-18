@@ -101,7 +101,9 @@ export function Dashboard({
         </div>
       )}
 
-      {importing && <ImportDialog onClose={() => setImporting(false)} />}
+      {importing && (
+        <ImportDialog onClose={() => setImporting(false)} navigate={navigate} />
+      )}
     </main>
   );
 }
