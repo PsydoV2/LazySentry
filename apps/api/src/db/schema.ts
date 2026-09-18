@@ -225,6 +225,11 @@ export const vulnerabilities = sqliteTable(
     lastSeenScanId: integer('last_seen_scan_id').notNull(),
     resolvedScanId: integer('resolved_scan_id'),
     resolvedAt: integer('resolved_at', { mode: 'timestamp_ms' }),
+    // User-driven mute (roadmap Phase 3, docs/CONCEPT.md 2.3) — distinct from
+    // `status`, which is scan-reconciliation-driven only. Never touched by
+    // reconciliation, so it survives every future scan of the same finding
+    // until explicitly cleared.
+    suppressedAt: integer('suppressed_at', { mode: 'timestamp_ms' }),
   },
   (table) => [
     uniqueIndex('vulns_project_fingerprint_unique').on(
@@ -285,6 +290,11 @@ export const secrets = sqliteTable(
     lastSeenScanId: integer('last_seen_scan_id').notNull(),
     resolvedScanId: integer('resolved_scan_id'),
     resolvedAt: integer('resolved_at', { mode: 'timestamp_ms' }),
+    // User-driven mute (roadmap Phase 3, docs/CONCEPT.md 2.3) — distinct from
+    // `status`, which is scan-reconciliation-driven only. Never touched by
+    // reconciliation, so it survives every future scan of the same finding
+    // until explicitly cleared.
+    suppressedAt: integer('suppressed_at', { mode: 'timestamp_ms' }),
   },
   (table) => [
     uniqueIndex('secrets_project_fingerprint_unique').on(

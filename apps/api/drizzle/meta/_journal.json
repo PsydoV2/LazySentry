@@ -57,6 +57,13 @@
       "when": 1789727964809,
       "tag": "0007_glossy_exodus",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1789754087938,
+      "tag": "0008_violet_argent",
+      "breakpoints": true
     }
   ]
 }
