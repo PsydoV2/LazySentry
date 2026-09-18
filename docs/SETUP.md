@@ -4,6 +4,20 @@ This walks through getting LazySentry running with Docker Compose — the
 supported way to run it — from nothing installed to your first scanned
 repository. No git checkout needed.
 
+## Contents
+
+- [Prerequisites](#prerequisites)
+- [1. Get the two files you need and configure the environment](#1-get-the-two-files-you-need-and-configure-the-environment)
+- [2. Start it](#2-start-it)
+- [3. First run: create the admin account](#3-first-run-create-the-admin-account)
+- [4. Connect GitHub](#4-connect-github)
+- [5. Import a repository](#5-import-a-repository)
+- [Reading the results](#reading-the-results)
+- [Turning off verification or secret scanning per project](#turning-off-verification-or-secret-scanning-per-project)
+- [Updating](#updating)
+- [Exposing this beyond localhost](#exposing-this-beyond-localhost)
+- [Troubleshooting](#troubleshooting)
+
 ## Prerequisites
 
 - Docker and Docker Compose v2 (`docker compose version`)
@@ -25,10 +39,18 @@ cp .env.example .env
 
 Open `.env` and generate a master encryption key — this is the one value
 that is not optional; the app refuses to start without it, because it's
-what protects your stored GitHub token and settings:
+what protects your stored GitHub token and settings. It must be a
+**64-character hex string** (32 random bytes, used as an AES-256 key):
 
 ```sh
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+openssl rand -hex 32
+```
+
+No OpenSSL on your machine? Since Docker is already required for this setup,
+this works everywhere Docker does, without installing anything else:
+
+```sh
+docker run --rm alpine sh -c "head -c32 /dev/urandom | od -An -tx1 | tr -d ' \n'"
 ```
 
 Paste the output as `APP_ENCRYPTION_KEY` in `.env`. **Back this value up
@@ -57,7 +79,7 @@ both.
 
 ## 3. First run: create the admin account
 
-Open **<http://127.0.0.1:3111>**. Since no admin account exists yet, you land
+Open `http://127.0.0.1:3111`. Since no admin account exists yet, you land
 directly in the setup wizard.
 
 **Step 1 — Create admin account.** Pick a username and password. This is the
@@ -124,7 +146,7 @@ repository size. The card updates live; no need to refresh the page.
   verified finding.
 - **"No lockfiles found"** on a card is not a clean bill of health — it means
   dependency scanning had nothing to check. It's shown as `completed with
-warnings`, not green.
+  warnings`, not green.
 
 ## Turning off verification or secret scanning per project
 
@@ -169,3 +191,5 @@ header (most don't need this — see the comment in `.env.example`).
   Windows path to a `.exe`), which `docker-compose.yml` deliberately
   overrides — if it still misbehaves, check `docker compose config` to see
   the environment Compose actually resolved.
+
+Still stuck? Open an issue on [GitHub](https://github.com/PsydoV2/LazySentry/issues) with the output of `docker compose logs`.

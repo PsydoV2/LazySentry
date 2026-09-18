@@ -23,8 +23,9 @@ export class EncryptionKeyError extends Error {}
 export function parseEncryptionKey(raw: string | undefined): Buffer {
   const hint =
     'Generate one with:\n' +
-    '  node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"\n' +
-    'and set it as APP_ENCRYPTION_KEY in your .env file.\n' +
+    '  openssl rand -hex 32\n' +
+    '(no OpenSSL? if you have Node.js: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))")\n' +
+    `Set the ${KEY_BYTES * 2}-character result as APP_ENCRYPTION_KEY in your .env file.\n` +
     'Keep it safe: losing it makes stored tokens unrecoverable.';
 
   if (!raw || raw.trim() === '') {
@@ -39,7 +40,8 @@ export function parseEncryptionKey(raw: string | undefined): Buffer {
   const key = Buffer.from(trimmed, 'hex');
   if (key.length !== KEY_BYTES) {
     throw new EncryptionKeyError(
-      `APP_ENCRYPTION_KEY must be ${KEY_BYTES} bytes (${KEY_BYTES * 2} hex characters), got ${key.length}.\n${hint}`,
+      `APP_ENCRYPTION_KEY must be a ${KEY_BYTES * 2}-character hex string ` +
+        `(${KEY_BYTES} bytes), but got ${trimmed.length} characters (${key.length} bytes).\n${hint}`,
     );
   }
   return key;

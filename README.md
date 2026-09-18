@@ -2,6 +2,10 @@
 
 **Self-hosted security & maintenance dashboard for your repositories.**
 
+[![Build](https://github.com/PsydoV2/LazySentry/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/PsydoV2/LazySentry/actions/workflows/docker-publish.yml)
+[![License: MIT](https://img.shields.io/github/license/PsydoV2/LazySentry)](LICENSE)
+[![Docker Image](https://img.shields.io/badge/ghcr.io-psydov2%2Flazysentry-blue?logo=docker)](https://github.com/PsydoV2/LazySentry/pkgs/container/lazysentry)
+
 One `docker compose up -d`, one browser tab — and for every repository you care about you can see:
 
 - 🛡️ **Vulnerabilities** — all direct and transitive dependencies checked against the [OSV database](https://osv.dev)
@@ -10,13 +14,29 @@ One `docker compose up -d`, one browser tab — and for every repository you car
 
 > **Status: MVP.** Dependency/CVE tracking, version auditing, secret detection, GitHub/GitLab import (several accounts at once) and the dashboard are implemented and covered by tests. Pre-1.0 — expect rough edges, and see the roadmap below for what's intentionally not here yet.
 
+## Contents
+
+- [Who is this for?](#who-is-this-for)
+- [Design principles](#design-principles)
+- [Architecture](#architecture)
+- [Tech stack](#tech-stack)
+- [Installation](#installation)
+  - [Docker Compose (recommended)](#docker-compose-recommended)
+  - [Configuration](#configuration)
+  - [Local development](#local-development)
+- [Reading the dashboard](#reading-the-dashboard)
+- [Updating](#updating)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [License](#license)
+
 ## Who is this for?
 
 Individual developers and small teams with **5–50 repositories**. The individual scanners already exist as excellent open-source tools, and enterprise aggregation platforms exist too — but they come with multiple services, role models, and heavyweight setup. LazySentry fills the gap in between: **one container, five minutes of setup**, and a dashboard you actually want to open.
 
 The value is not in custom scan engines — it's in orchestration, tracking findings over time, and a UI that answers three questions for every finding without a click: _What is this? How bad is it? What do I do now?_
 
-## Key principles
+## Design principles
 
 - **Your code stays on your infrastructure.** Repositories are cloned to a temporary directory inside the worker container, scanned, and deleted. No source code leaves your server.
 - **Raw secrets are never stored.** TruffleHog findings are immediately reduced to a fingerprint and a masked preview (`AKIA…IFXG`). The plaintext never touches the database, logs, or error messages.
@@ -29,14 +49,14 @@ The value is not in custom scan engines — it's in orchestration, tracking find
 
 A single Docker image with two processes and a SQLite database on a shared volume:
 
-```
+```text
 ┌──────────────────────┐    ┌─────────────────────┐
-│  api                 │    │  worker             │
-│  Fastify + React UI  │    │  scan queue loop    │
-│                      │    │  + scanner binaries │
-└──────────┬───────────┘    └──────────┬──────────┘
-           └───────────┬───────────────┘
-                ┌──────▼───────┐
+│  api                  │    │  worker             │
+│  Fastify + React UI   │    │  scan queue loop    │
+│                       │    │  + scanner binaries │
+└──────────┬────────────┘    └──────────┬──────────┘
+           └───────────┬─────────────────┘
+                ┌───────▼──────┐
                 │   SQLite     │  (volume)
                 └──────────────┘
 ```
@@ -50,21 +70,21 @@ A single Docker image with two processes and a SQLite database on a shared volum
 
 TypeScript end to end: [Fastify](https://fastify.dev) backend, [React](https://react.dev) + [Vite](https://vite.dev) frontend, [Drizzle ORM](https://orm.drizzle.team) on SQLite, [Zod](https://zod.dev) for validation, [TanStack Query](https://tanstack.com/query) for data fetching.
 
-```
+```text
 apps/api          Fastify server (serves API + built frontend) and the scan worker
 apps/web          React frontend
 packages/shared   Zod schemas & types shared between API and frontend
-docs/CONCEPT.md   Full product & implementation spec (German)
 docs/SETUP.md     Step-by-step setup guide (Docker, GitHub token, first scan)
 Dockerfile                Image build (pushed to GHCR by CI)
 docker-compose.yml        Two-service setup, pulls the published image
 docker-compose.build.yml  Override to build from source instead
 ```
 
-## Getting started (Docker)
+## Installation
 
-This is the supported way to run LazySentry. Requires Docker and Docker
-Compose v2 — **no git clone needed**, just two files:
+### Docker Compose (recommended)
+
+Requires Docker and Docker Compose v2 — **no git clone needed**, just two files:
 
 ```sh
 mkdir lazysentry && cd lazysentry
@@ -72,13 +92,13 @@ curl -O https://raw.githubusercontent.com/PsydoV2/LazySentry/main/docker-compose
 curl -O https://raw.githubusercontent.com/PsydoV2/LazySentry/main/.env.example
 cp .env.example .env
 # generate a key and paste it into .env as APP_ENCRYPTION_KEY:
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+openssl rand -hex 32
 
 docker compose up -d
 ```
 
-This pulls the prebuilt image from GHCR (`ghcr.io/psydov2/lazysentry`) —
-no local build step. Open **http://127.0.0.1:3111** — you land in the setup
+This pulls the prebuilt image from GHCR (`ghcr.io/psydov2/lazysentry`) — no
+local build step. Open **`http://127.0.0.1:3111`** — you land in the setup
 wizard (create the admin account, then connect GitHub with a personal
 access token scoped to `Contents: read` + `Metadata: read`). Additional
 accounts — more GitHub accounts, or GitLab (gitlab.com or self-hosted) —
@@ -93,10 +113,27 @@ port is bound to `127.0.0.1`; put a reverse proxy in front to expose it
 beyond the host.
 
 Prefer building from source instead of pulling the image? Clone the repo
-and run `docker compose -f docker-compose.yml -f docker-compose.build.yml
-up -d --build`.
+and run `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`.
 
-## Getting started (development)
+### Configuration
+
+Everything is configured through `.env`. For the Docker Compose setup, only
+the first row below is required — the rest already have sane defaults, and
+`HOST`, `DATABASE_PATH`, `OSV_SCANNER_PATH` and `TRUFFLEHOG_PATH` are pinned
+to the correct in-container values by `docker-compose.yml` itself.
+
+| Variable | Required | Default | Description |
+| --- | --- | --- | --- |
+| `APP_ENCRYPTION_KEY` | **Yes** | — | 64-character hex string (32 random bytes, AES-256-GCM) that encrypts stored tokens and settings. Generate with the command above. |
+| `HTTPS` | No | `false` | Set to `true` once the dashboard is served over HTTPS, so the session cookie gets the `Secure` attribute. |
+| `APP_ORIGIN` | No | — | Public URL to check state-changing requests against — only needed if your reverse proxy rewrites `Host`. |
+| `HOST` / `PORT` | No | `127.0.0.1` / `3111` | Bind address and port. Only relevant outside Docker; Compose sets these internally. |
+| `DATABASE_PATH` | No | `./data/lazysentry.db` | SQLite file location. Only relevant outside Docker. |
+
+See [`.env.example`](.env.example) for the full, commented list, and
+[docs/SETUP.md](docs/SETUP.md) for exposing LazySentry beyond localhost.
+
+### Local development
 
 Requires Node.js ≥ 22 and [pnpm](https://pnpm.io).
 
@@ -123,12 +160,43 @@ repository is clean.
 
 Other commands: `pnpm build` (all packages), `pnpm test`, `pnpm typecheck`.
 
+## Reading the dashboard
+
+- **Card color is urgency, not severity**: a verified secret always outranks
+  even a critical CVE, because an active leaked credential is exploitable
+  _right now_. Red > orange > blue > green.
+- A **verified** secret means TruffleHog confirmed the credential still
+  works by testing it live against the provider's API. Removing the line
+  from the code is not enough — the secret is still in git history and still
+  functions until it's rotated.
+- **"No lockfiles found"** on a card is not a clean bill of health — it means
+  dependency scanning had nothing to check. It's shown as `completed with
+warnings`, not green.
+
+See [docs/SETUP.md](docs/SETUP.md#reading-the-results) for the full breakdown of card and scan states.
+
+## Updating
+
+```sh
+docker compose pull
+docker compose up -d
+```
+
+Database migrations run automatically on `api` startup, against the
+existing volume — no manual migration step, no data loss.
+
 ## Roadmap
 
 **MVP (done):** dependency & CVE tracking, version auditing, secret detection with verification, GitHub import via personal access token, dashboard with per-project detail view, Docker Compose setup.
 
 **After the MVP:** multi-provider & multi-account support (GitHub + GitLab, several accounts side by side — done) → notifications (Discord first) & scheduled scans → EPSS/CISA-KEV prioritization → AI-assisted triage & upgrade hints → SBOM export.
 
+## Contributing
+
+This is a young, single-maintainer project — issues and pull requests are
+welcome, but for anything larger than a small fix, please open an issue
+first to discuss the approach before investing time in a PR.
+
 ## License
 
-Not yet decided.
+[MIT](LICENSE)
