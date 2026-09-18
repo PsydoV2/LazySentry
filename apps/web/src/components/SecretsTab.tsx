@@ -4,7 +4,7 @@
 // dangerouslySetInnerHTML (docs/CONCEPT.md rule 7 / 6.2).
 
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EmptyState } from './EmptyState';
 import { api, type Project, type Secret } from '../lib/api';
 import { formatDateTime, shortSha } from '../lib/format';
@@ -12,21 +12,40 @@ import { IconCheck, IconFolder, IconKey, IconShieldAlert, IconShieldCheck } from
 
 export function SecretsTab({ project }: { project: Project }) {
   const projectId = project.id;
+  const queryClient = useQueryClient();
   const [showResolved, setShowResolved] = useState(false);
+  const [showSuppressed, setShowSuppressed] = useState(false);
 
   const secrets = useQuery({
     queryKey: ['project', projectId, 'secrets'],
     queryFn: () => api.get<Secret[]>(`/api/projects/${projectId}/secrets`),
   });
 
+  const suppress = useMutation({
+    mutationFn: ({ secretId, suppressed }: { secretId: number; suppressed: boolean }) =>
+      api.patch(`/api/projects/${projectId}/secrets/${secretId}`, { suppressed }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project', projectId, 'secrets'] });
+      queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+    },
+  });
+
   const rows = useMemo(
-    () => (secrets.data ?? []).filter((s) => showResolved || s.status === 'open'),
-    [secrets.data, showResolved],
+    () =>
+      (secrets.data ?? []).filter(
+        (s) =>
+          (showResolved || s.status === 'open') &&
+          (showSuppressed || s.suppressedAt === null),
+      ),
+    [secrets.data, showResolved, showSuppressed],
   );
 
   const openCount = (secrets.data ?? []).filter((s) => s.status === 'open').length;
+  // Suppressed secrets are excluded from the "rotate immediately" warning —
+  // the user already acknowledged this one (Phase 3 suppression workflow).
   const verifiedOpenCount = (secrets.data ?? []).filter(
-    (s) => s.status === 'open' && s.isVerified,
+    (s) => s.status === 'open' && s.isVerified && s.suppressedAt === null,
   ).length;
   const resolvedCount = (secrets.data ?? []).filter((s) => s.status === 'resolved').length;
 
@@ -68,6 +87,14 @@ export function SecretsTab({ project }: { project: Project }) {
             onChange={(event) => setShowResolved(event.target.checked)}
           />
           Show resolved findings
+        </label>
+        <label className="row" style={{ gap: 6 }}>
+          <input
+            type="checkbox"
+            checked={showSuppressed}
+            onChange={(event) => setShowSuppressed(event.target.checked)}
+          />
+          Show suppressed
         </label>
         <span className="table-summary subtle">
           {openCount} open{verifiedOpenCount > 0 ? ` (${verifiedOpenCount} verified)` : ''}
@@ -117,6 +144,9 @@ export function SecretsTab({ project }: { project: Project }) {
                   <StatusIcon className="pill-icon" />
                   {status.label}
                 </span>
+                {secret.suppressedAt !== null && (
+                  <span className="pill pill-neutral">suppressed</span>
+                )}
 
                 <div className="stack" style={{ flex: 1, gap: 2 }}>
                   <span>
@@ -138,6 +168,20 @@ export function SecretsTab({ project }: { project: Project }) {
                 </div>
 
                 <span className="mono subtle">{secret.redacted}</span>
+
+                <button
+                  type="button"
+                  className="btn-quiet"
+                  disabled={suppress.isPending}
+                  onClick={() =>
+                    suppress.mutate({
+                      secretId: secret.id,
+                      suppressed: secret.suppressedAt === null,
+                    })
+                  }
+                >
+                  {secret.suppressedAt !== null ? 'Unsuppress' : 'Suppress'}
+                </button>
               </div>
             );
           })}

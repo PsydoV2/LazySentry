@@ -3,7 +3,7 @@
 // visibly separated.
 
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EmptyState } from './EmptyState';
 import { api, type PackageEntry, type Project, type Vulnerability } from '../lib/api';
 import { IconAlertTriangle, IconBug, IconChevronDown, IconFolder, IconPackage } from './icons';
@@ -36,12 +36,24 @@ const SEVERITY_PILL: Record<Vulnerability['severity'], string> = {
 
 export function DependenciesTab({ project }: { project: Project }) {
   const projectId = project.id;
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [ecosystem, setEcosystem] = useState('');
   const [directOnly, setDirectOnly] = useState(false);
   const [vulnerableOnly, setVulnerableOnly] = useState(false);
+  const [showSuppressed, setShowSuppressed] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [expanded, setExpanded] = useState<number | null>(null);
+
+  const suppress = useMutation({
+    mutationFn: ({ vulnId, suppressed }: { vulnId: number; suppressed: boolean }) =>
+      api.patch(`/api/projects/${projectId}/vulnerabilities/${vulnId}`, { suppressed }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project', projectId, 'vulnerabilities'] });
+      queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+    },
+  });
 
   const packages = useQuery({
     queryKey: ['project', projectId, 'packages'],
@@ -58,13 +70,14 @@ export function DependenciesTab({ project }: { project: Project }) {
     const map = new Map<string, Vulnerability[]>();
     for (const vuln of vulnerabilities.data ?? []) {
       if (vuln.status !== 'open') continue;
+      if (!showSuppressed && vuln.suppressedAt !== null) continue;
       const key = `${vuln.packageEcosystem ?? ''}::${vuln.packageName ?? ''}`;
       const list = map.get(key) ?? [];
       list.push(vuln);
       map.set(key, list);
     }
     return map;
-  }, [vulnerabilities.data]);
+  }, [vulnerabilities.data, showSuppressed]);
 
   const ecosystems = useMemo(
     () => [...new Set((packages.data ?? []).map((pkg) => pkg.ecosystem))].sort(),
@@ -178,6 +191,14 @@ export function DependenciesTab({ project }: { project: Project }) {
           />
           Vulnerable only
         </label>
+        <label className="row" style={{ gap: 6 }}>
+          <input
+            type="checkbox"
+            checked={showSuppressed}
+            onChange={(event) => setShowSuppressed(event.target.checked)}
+          />
+          Show suppressed
+        </label>
         {filtersActive && (
           <button
             type="button"
@@ -289,6 +310,9 @@ export function DependenciesTab({ project }: { project: Project }) {
                         <span className={`pill ${SEVERITY_PILL[vuln.severity]}`}>
                           {vuln.severity}
                         </span>
+                        {vuln.suppressedAt !== null && (
+                          <span className="pill pill-neutral">suppressed</span>
+                        )}
                         <div className="stack" style={{ gap: 2, flex: 1 }}>
                           <span>
                             <a
@@ -309,6 +333,19 @@ export function DependenciesTab({ project }: { project: Project }) {
                               : 'No fixed version published yet'}
                           </span>
                         </div>
+                        <button
+                          type="button"
+                          className="btn-quiet"
+                          disabled={suppress.isPending}
+                          onClick={() =>
+                            suppress.mutate({
+                              vulnId: vuln.id,
+                              suppressed: vuln.suppressedAt === null,
+                            })
+                          }
+                        >
+                          {vuln.suppressedAt !== null ? 'Unsuppress' : 'Suppress'}
+                        </button>
                       </div>
                     ))}
                   </div>
