@@ -269,6 +269,15 @@ export function IconPin(props: IconProps) {
   );
 }
 
+/** Solid variant of {@link IconPin} for the pinned state — same silhouette, filled. */
+export function IconPinFilled(props: IconProps) {
+  return (
+    <svg {...base(props)} strokeWidth={0} fill="currentColor" viewBox="0 0 24 24">
+      <path d="M9 4.5a1 1 0 0 1 1-1h4a1 1 0 1 1 0 2v3.2c0 .53.2 1.04.57 1.42l1.6 1.7c.53.56.83 1.3.83 2.08V13a1 1 0 0 1-1 1h-3v6a1 1 0 1 1-2 0v-6H8a1 1 0 0 1-1-1v-.1c0-.78.3-1.52.83-2.08l1.6-1.7c.37-.38.57-.89.57-1.42V5.5a1 1 0 0 1-1-1Z" />
+    </svg>
+  );
+}
+
 export function IconGripVertical(props: IconProps) {
   return (
     <svg {...base(props)} strokeWidth={0} fill="currentColor" viewBox="0 0 24 24">

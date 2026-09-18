@@ -1261,6 +1261,24 @@ button:disabled {
   background: var(--bg);
 }
 
+.card-icon-btn.is-pinned {
+  color: var(--accent);
+}
+
+.card-icon-btn.is-pinned:hover:not(:disabled) {
+  color: var(--accent);
+  background: var(--bg);
+}
+
+/* Sits at the far right of the action row, its icon rotated so the pin's
+   tip points down-left, toward the card's center, instead of straight
+   down. */
+.pin-toggle-icon {
+  width: 19px;
+  height: 19px;
+  transform: rotate(45deg);
+}
+
 /* Per-card overflow menu (pin / move to section) — same floating dropdown
    as .user-menu-dropdown, just anchored to a relatively-positioned wrapper
    inline in the card's action row instead of a fixed corner avatar. */

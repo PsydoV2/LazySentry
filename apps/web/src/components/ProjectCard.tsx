@@ -19,6 +19,7 @@ import {
   IconLock,
   IconPackage,
   IconPin,
+  IconPinFilled,
   IconPlay,
   IconSettings,
   IconShieldAlert,
@@ -128,6 +129,23 @@ export function ProjectCard({
             onTogglePin={onTogglePin}
             onMoveToSection={onMoveToSection}
           />
+          <button
+            type="button"
+            className={`card-icon-btn pin-toggle-btn${project.pinned ? ' is-pinned' : ''}`}
+            title={project.pinned ? 'Unpin' : 'Pin to top'}
+            aria-label={project.pinned ? `Unpin ${project.name}` : `Pin ${project.name} to top`}
+            aria-pressed={project.pinned}
+            onClick={(event) => {
+              event.stopPropagation();
+              onTogglePin();
+            }}
+          >
+            {project.pinned ? (
+              <IconPinFilled className="pin-toggle-icon" />
+            ) : (
+              <IconPin className="pin-toggle-icon" />
+            )}
+          </button>
         </div>
       </div>
 
