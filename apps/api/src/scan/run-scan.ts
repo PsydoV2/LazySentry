@@ -34,6 +34,7 @@ import {
 } from '../scanner/osv-scanner.js';
 import { runTruffleHog, type TruffleHogFinding } from '../scanner/trufflehog.js';
 import { SCANNER_VERSIONS } from '../scanner/versions.js';
+import { collectDirectDependencyNames } from './direct-deps.js';
 import {
   auditPackageVersions,
   cacheKey,
@@ -154,7 +155,8 @@ export async function runScan(
         // (docs/CONCEPT.md 0.3), so every lookup happens before the
         // synchronous persist step below even opens one.
         const versions = await auditPackageVersions(collectPackageRefs(osv.output));
-        persistDependencyResults(projectId, scanId, osv.output, versions);
+        const directNames = await collectDirectDependencyNames(scanDir);
+        persistDependencyResults(projectId, scanId, osv.output, versions, directNames);
         break;
       }
       case 'completed_empty':
@@ -279,12 +281,19 @@ function persistDependencyResults(
   scanId: number,
   output: OsvScannerOutput,
   versions: Map<string, VersionAuditResult>,
+  directNames: Map<string, Set<string>>,
 ): void {
   const now = new Date();
   db.transaction((tx) => {
     for (const result of output.results ?? []) {
       for (const entry of result.packages) {
         const audit = versions.get(cacheKey(entry.package.ecosystem, entry.package.name));
+        // No manifest found for this ecosystem in the clone → unknown, not
+        // "transitive" (rule 2: don't turn "couldn't determine" into a guess).
+        const ecosystemDirectNames = directNames.get(entry.package.ecosystem);
+        const isDirect = ecosystemDirectNames
+          ? ecosystemDirectNames.has(entry.package.name)
+          : null;
         const packageRow = tx
           .insert(packages)
           .values({
@@ -294,6 +303,7 @@ function persistDependencyResults(
             versionInstalled: entry.package.version,
             versionLatest: audit?.versionLatest ?? null,
             updateType: audit?.updateType ?? 'unknown',
+            isDirect,
             sourceFile: result.source.path,
           })
           .returning({ id: packages.id })

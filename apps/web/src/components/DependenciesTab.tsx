@@ -246,7 +246,9 @@ export function DependenciesTab({ project }: { project: Project }) {
                   <span className="table-cell-stack">
                     <span className="table-cell-title">
                       <span title={pkg.name}>{pkg.name}</span>
-                      {!pkg.isDirect && <span className="pill pill-neutral">transitive</span>}
+                      {pkg.isDirect === false && (
+                        <span className="pill pill-neutral">transitive</span>
+                      )}
                     </span>
                     {pkg.sourceFile && (
                       <span className="table-cell-path subtle" title={pkg.sourceFile}>
