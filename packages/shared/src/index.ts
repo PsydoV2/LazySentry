@@ -292,6 +292,9 @@ export interface PackageEntry {
   updateType: UpdateType;
   isDirect: boolean | null;
   sourceFile: string | null;
+  /** Declared license as reported by the registry, e.g. an SPDX expression.
+   * Null when unknown — never a guess (docs/CONCEPT.md 2.5). */
+  license: string | null;
 }
 
 export interface Vulnerability {

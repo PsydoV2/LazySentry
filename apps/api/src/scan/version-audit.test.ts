@@ -1,23 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const cacheStore = new Map<string, string | null>();
+const cacheStore = new Map<string, { latestVersion: string | null; license: string | null }>();
 
 vi.mock('../registries/cache.js', () => ({
   getCached: vi.fn((ecosystem: string, name: string) => {
     const key = `${ecosystem} ${name}`;
-    return cacheStore.has(key)
-      ? { hit: true, latestVersion: cacheStore.get(key) ?? null }
-      : { hit: false, latestVersion: null };
+    const entry = cacheStore.get(key);
+    return entry
+      ? { hit: true, latestVersion: entry.latestVersion, license: entry.license }
+      : { hit: false, latestVersion: null, license: null };
   }),
-  setCached: vi.fn((ecosystem: string, name: string, version: string | null) => {
-    cacheStore.set(`${ecosystem} ${name}`, version);
-  }),
+  setCached: vi.fn(
+    (ecosystem: string, name: string, latestVersion: string | null, license: string | null) => {
+      cacheStore.set(`${ecosystem} ${name}`, { latestVersion, license });
+    },
+  ),
 }));
 
-const npmGetLatestVersion = vi.fn();
+const npmGetPackageInfo = vi.fn();
 vi.mock('../registries/index.js', () => ({
   getRegistryClient: vi.fn((ecosystem: string) =>
-    ecosystem === 'npm' ? { getLatestVersion: npmGetLatestVersion } : undefined,
+    ecosystem === 'npm' ? { getPackageInfo: npmGetPackageInfo } : undefined,
   ),
 }));
 
@@ -25,28 +28,29 @@ const { auditPackageVersions, cacheKey } = await import('./version-audit.js');
 
 beforeEach(() => {
   cacheStore.clear();
-  npmGetLatestVersion.mockReset();
+  npmGetPackageInfo.mockReset();
 });
 
 describe('auditPackageVersions', () => {
-  it('resolves the update type for each unique (ecosystem, name)', async () => {
-    npmGetLatestVersion.mockResolvedValue('5.0.0');
+  it('resolves the update type and license for each unique (ecosystem, name)', async () => {
+    npmGetPackageInfo.mockResolvedValue({ latestVersion: '5.0.0', license: 'MIT' });
     const results = await auditPackageVersions([
       { ecosystem: 'npm', name: 'lodash', versionInstalled: '4.17.4' },
     ]);
     expect(results.get(cacheKey('npm', 'lodash'))).toEqual({
       versionLatest: '5.0.0',
       updateType: 'major',
+      license: 'MIT',
     });
   });
 
   it('only looks a package up once even if it appears in multiple lockfiles', async () => {
-    npmGetLatestVersion.mockResolvedValue('4.18.1');
+    npmGetPackageInfo.mockResolvedValue({ latestVersion: '4.18.1', license: 'MIT' });
     await auditPackageVersions([
       { ecosystem: 'npm', name: 'lodash', versionInstalled: '4.17.4' },
       { ecosystem: 'npm', name: 'lodash', versionInstalled: '4.17.4' },
     ]);
-    expect(npmGetLatestVersion).toHaveBeenCalledTimes(1);
+    expect(npmGetPackageInfo).toHaveBeenCalledTimes(1);
   });
 
   it('marks an unsupported ecosystem as unknown without calling any registry', async () => {
@@ -56,13 +60,16 @@ describe('auditPackageVersions', () => {
     expect(results.get(cacheKey('crates.io', 'serde'))).toEqual({
       versionLatest: null,
       updateType: 'unknown',
+      license: null,
     });
-    expect(npmGetLatestVersion).not.toHaveBeenCalled();
+    expect(npmGetPackageInfo).not.toHaveBeenCalled();
   });
 
   it('does not let one failing lookup abort the others', async () => {
-    npmGetLatestVersion.mockImplementation((name: string) =>
-      name === 'broken' ? Promise.reject(new Error('boom')) : Promise.resolve('9.9.9'),
+    npmGetPackageInfo.mockImplementation((name: string) =>
+      name === 'broken'
+        ? Promise.reject(new Error('boom'))
+        : Promise.resolve({ latestVersion: '9.9.9', license: 'ISC' }),
     );
     const results = await auditPackageVersions([
       { ecosystem: 'npm', name: 'broken', versionInstalled: '1.0.0' },
@@ -71,19 +78,21 @@ describe('auditPackageVersions', () => {
     expect(results.get(cacheKey('npm', 'broken'))).toEqual({
       versionLatest: null,
       updateType: 'unknown',
+      license: null,
     });
     expect(results.get(cacheKey('npm', 'fine'))).toEqual({
       versionLatest: '9.9.9',
       updateType: 'major',
+      license: 'ISC',
     });
   });
 
   it('uses the cache instead of calling the registry again', async () => {
-    npmGetLatestVersion.mockResolvedValue('9.9.9');
+    npmGetPackageInfo.mockResolvedValue({ latestVersion: '9.9.9', license: 'MIT' });
     await auditPackageVersions([{ ecosystem: 'npm', name: 'lodash', versionInstalled: '1.0.0' }]);
-    expect(npmGetLatestVersion).toHaveBeenCalledTimes(1);
+    expect(npmGetPackageInfo).toHaveBeenCalledTimes(1);
 
     await auditPackageVersions([{ ecosystem: 'npm', name: 'lodash', versionInstalled: '1.0.0' }]);
-    expect(npmGetLatestVersion).toHaveBeenCalledTimes(1); // still 1 — served from cache
+    expect(npmGetPackageInfo).toHaveBeenCalledTimes(1); // still 1 — served from cache
   });
 });

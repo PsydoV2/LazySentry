@@ -1,17 +1,30 @@
-// Packagist registry lookup (docs/CONCEPT.md 5.3). The p2 endpoint returns
+// Packagist registry lookup (docs/CONCEPT.md 5.3, 2.5). The p2 endpoint returns
 // every published version newest-first, including prereleases and dev
 // branches (e.g. "dev-main") — the first entry is not necessarily a stable
 // release, so we pick the first one that parses as stable semver ourselves.
 
 import semver from 'semver';
-import { fetchWithTimeout, type RegistryClient } from './types.js';
+import { fetchWithTimeout, type PackageInfo, type RegistryClient } from './types.js';
+
+interface PackagistVersionEntry {
+  version: string;
+  /** SPDX identifiers; Composer allows more than one for dual-licensed packages. */
+  license?: string[];
+}
 
 interface PackagistResponse {
-  packages: Record<string, { version: string }[]>;
+  packages: Record<string, PackagistVersionEntry[]>;
+}
+
+function licenseFrom(entry: PackagistVersionEntry): string | null {
+  if (!entry.license || entry.license.length === 0) return null;
+  // Composer's own convention for "either" licensing — mirrors how an SPDX
+  // expression would read, without pulling in a full SPDX-expression parser.
+  return entry.license.join(' OR ');
 }
 
 export const packagistRegistry: RegistryClient = {
-  async getLatestVersion(packageName: string): Promise<string | null> {
+  async getPackageInfo(packageName: string): Promise<PackageInfo | null> {
     const url = `https://repo.packagist.org/p2/${packageName}.json`;
     const response = await fetchWithTimeout(url);
     if (response.status === 404) return null;
@@ -26,7 +39,9 @@ export const packagistRegistry: RegistryClient = {
       // the leading "v" and rejects anything that is not a stable release
       // (a "dev-main" branch or a "-RC1"/"-beta" prerelease tag).
       const stable = semver.clean(entry.version, { loose: true });
-      if (stable && !semver.prerelease(stable)) return stable;
+      if (stable && !semver.prerelease(stable)) {
+        return { latestVersion: stable, license: licenseFrom(entry) };
+      }
     }
     return null;
   },

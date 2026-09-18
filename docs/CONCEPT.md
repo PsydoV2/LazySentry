@@ -82,12 +82,18 @@ Ein vollständig selbsthostbares Security- und Wartungs-Dashboard für einzelne 
 
 ### 2.2 Explizite Nicht-Ziele für das MVP
 
-Diese Punkte sind bewusst ausgeschlossen. Agents sollen sie **nicht** vorwegnehmen, auch nicht „schon mal vorbereiten":
+> **Siehe 2.5:** Das MVP ist inzwischen abgeschlossen. Diese Liste ist kein
+> pauschales Verbot mehr, sondern der Ausgangszustand, aus dem heraus der
+> Projektinhaber einzelne Punkte gezielt freigibt — wie bereits bei
+> Multi-Provider (2.4) und License-Compliance (2.5) geschehen. Ohne dokumentierte
+> Freigabe hier gilt ein Punkt weiterhin als nicht angefangen.
+
+Diese Punkte waren für das MVP selbst bewusst ausgeschlossen. Agents sollen sie ohne Freigabe laut 2.5 **nicht** vorwegnehmen, auch nicht „schon mal vorbereiten":
 
 - Mehrbenutzerbetrieb, Rollen, Teams
 - Webhooks, Tunneling, Event-getriebene Scans
 - KI-Features jeglicher Art
-- License-Compliance
+- License-Compliance — **teilweise freigegeben, siehe 2.5**
 - PostgreSQL (SQLite reicht; die Abstraktion muss den späteren Wechsel erlauben)
 - SBOM-Export
 
@@ -115,6 +121,17 @@ Ursprünglich Phase 6, auf expliziten Wunsch des Projektinhabers direkt nach dem
 - **Clone-Auth ist jetzt Host-basiert statt hartcodiert auf `github.com`** (`git config http.<origin>/.extraheader`) — Voraussetzung dafür, dass ein Token nicht versehentlich an den falschen Host geht, sobald mehrere Hosts im Spiel sind.
 - Bitbucket/Gitea sind weiterhin **nicht** implementiert — die Registry in `apps/api/src/providers/index.ts` macht das Hinzufügen eines weiteren Providers zu einer neuen Datei, aber niemand hat danach gefragt.
 - Löschen eines Git-Accounts ist blockiert (409), solange noch Projekte daran hängen (`DELETE /api/git-accounts/:id`) — das DB-Schema erlaubt zwar `ON DELETE CASCADE`, das wird aber nicht stillschweigend ausgelöst.
+
+### 2.5 MVP abgeschlossen — Nicht-Ziele werden ab jetzt einzeln freigegeben (2026-09-18)
+
+Das MVP (Phase 1–2 aus Abschnitt 10) ist fertiggestellt. Der Projektinhaber hat entschieden, dass ab jetzt an der Nicht-Ziele-Liste (2.2) weitergearbeitet werden darf — nicht als Freibrief für alle Punkte auf einmal, sondern nach demselben Muster wie bei Multi-Provider (2.4): **pro Feature eine explizite, hier dokumentierte Freigabe**, bevor ein Agent damit anfängt. Ohne Eintrag hier bleibt ein Nicht-Ziel gesperrt.
+
+**Freigabe 1 — License-Compliance, Scope „Lizenz-Erkennung pro Paket":**
+
+- Für jedes Paket aus dem OSV-`--all-packages`-Inventar (5.2) wird zusätzlich zum Registry-Lookup aus 5.3 die deklarierte Lizenz abgefragt (npm: `license`-Feld aus der Registry-Antwort, Packagist: `composer.json`-Metadaten, PyPI: Klassifiers/Metadata, crates.io: `license`-Feld der API) und wie die Versions-Daten 24h gecacht.
+- Neues Feld `packages.license` (Rohwert, z. B. SPDX-Ausdruck oder `unknown`, wenn die Registry nichts liefert oder der Ausdruck nicht geparst werden kann — nicht raten).
+- Anzeige in der Dependencies-Tabelle (8.2) als zusätzliche Spalte, kein eigener Severity-artiger Zustand.
+- **Ausdrücklich nicht Teil dieser Freigabe** (bleiben eigene, künftig einzeln zu entscheidende Nicht-Ziele): Allow-/Denylist-Policy, automatische Copyleft/Permissive-Klassifizierung samt Warn-UI, SBOM-Export (weiterhin Phase 6, siehe 2.3).
 
 ---
 

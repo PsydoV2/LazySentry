@@ -1499,7 +1499,7 @@ button:disabled {
 .data-table-header,
 .data-table-row {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr;
   gap: var(--space-3);
   align-items: center;
   padding: var(--space-3) var(--space-4);

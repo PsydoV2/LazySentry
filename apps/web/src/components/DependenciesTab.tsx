@@ -245,6 +245,7 @@ export function DependenciesTab({ project }: { project: Project }) {
               active={sortKey === 'updateType'}
               onClick={() => setSortKey('updateType')}
             />
+            <span>License</span>
             <SortableHeader
               label="Vulnerabilities"
               active={sortKey === 'vulnerabilities'}
@@ -285,6 +286,9 @@ export function DependenciesTab({ project }: { project: Project }) {
                       <IconPackage className="pill-icon" />
                       {UPDATE_LABEL[pkg.updateType]}
                     </span>
+                  </span>
+                  <span className="subtle mono" title={pkg.license ?? undefined}>
+                    {pkg.license ?? '—'}
                   </span>
                   <span className="row" style={{ gap: 6 }}>
                     {vulns.length > 0 ? (

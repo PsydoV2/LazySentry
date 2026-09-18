@@ -19,14 +19,47 @@ describe('packagistRegistry', () => {
           packages: {
             'symfony/console': [
               { version: 'v8.1.0-RC1' },
-              { version: 'v8.0.5' },
+              { version: 'v8.0.5', license: ['MIT'] },
               { version: 'v8.0.4' },
             ],
           },
         }),
       ),
     );
-    expect(await packagistRegistry.getLatestVersion('symfony/console')).toBe('8.0.5');
+    expect(await packagistRegistry.getPackageInfo('symfony/console')).toEqual({
+      latestVersion: '8.0.5',
+      license: 'MIT',
+    });
+  });
+
+  it('joins multiple (dual) licenses with OR', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        jsonResponse(200, {
+          packages: {
+            'acme/lib': [{ version: 'v2.0.0', license: ['MIT', 'Apache-2.0'] }],
+          },
+        }),
+      ),
+    );
+    expect(await packagistRegistry.getPackageInfo('acme/lib')).toEqual({
+      latestVersion: '2.0.0',
+      license: 'MIT OR Apache-2.0',
+    });
+  });
+
+  it('returns null license when the entry has none', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        jsonResponse(200, { packages: { 'acme/lib': [{ version: 'v2.0.0' }] } }),
+      ),
+    );
+    expect(await packagistRegistry.getPackageInfo('acme/lib')).toEqual({
+      latestVersion: '2.0.0',
+      license: null,
+    });
   });
 
   it('skips dev branch entries entirely', async () => {
@@ -40,7 +73,10 @@ describe('packagistRegistry', () => {
         }),
       ),
     );
-    expect(await packagistRegistry.getLatestVersion('acme/lib')).toBe('2.0.0');
+    expect(await packagistRegistry.getPackageInfo('acme/lib')).toEqual({
+      latestVersion: '2.0.0',
+      license: null,
+    });
   });
 
   it('returns null when only prereleases and dev branches exist', async () => {
@@ -52,11 +88,11 @@ describe('packagistRegistry', () => {
         }),
       ),
     );
-    expect(await packagistRegistry.getLatestVersion('acme/lib')).toBeNull();
+    expect(await packagistRegistry.getPackageInfo('acme/lib')).toBeNull();
   });
 
   it('returns null for a 404 (package not found)', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(404, {})));
-    expect(await packagistRegistry.getLatestVersion('acme/does-not-exist')).toBeNull();
+    expect(await packagistRegistry.getPackageInfo('acme/does-not-exist')).toBeNull();
   });
 });

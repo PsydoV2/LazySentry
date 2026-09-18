@@ -1,4 +1,4 @@
-// 24h cache for registry lookups (docs/CONCEPT.md 5.3): a large dependency
+// 24h cache for registry lookups (docs/CONCEPT.md 5.3, 2.5): a large dependency
 // tree would otherwise fire one HTTP request per package on every single
 // scan.
 
@@ -12,6 +12,7 @@ export interface CacheLookup {
   /** true when a usable (fresh) cache entry exists — including a cached "not found". */
   hit: boolean;
   latestVersion: string | null;
+  license: string | null;
 }
 
 export function getCached(ecosystem: string, packageName: string): CacheLookup {
@@ -25,11 +26,11 @@ export function getCached(ecosystem: string, packageName: string): CacheLookup {
       ),
     )
     .get();
-  if (!row) return { hit: false, latestVersion: null };
+  if (!row) return { hit: false, latestVersion: null, license: null };
 
   const age = Date.now() - row.fetchedAt.getTime();
-  if (age > CACHE_TTL_MS) return { hit: false, latestVersion: null };
-  return { hit: true, latestVersion: row.latestVersion };
+  if (age > CACHE_TTL_MS) return { hit: false, latestVersion: null, license: null };
+  return { hit: true, latestVersion: row.latestVersion, license: row.license };
 }
 
 /**
@@ -41,12 +42,13 @@ export function setCached(
   ecosystem: string,
   packageName: string,
   latestVersion: string | null,
+  license: string | null,
 ): void {
   db.insert(registryCache)
-    .values({ ecosystem, packageName, latestVersion, fetchedAt: new Date() })
+    .values({ ecosystem, packageName, latestVersion, license, fetchedAt: new Date() })
     .onConflictDoUpdate({
       target: [registryCache.ecosystem, registryCache.packageName],
-      set: { latestVersion, fetchedAt: new Date() },
+      set: { latestVersion, license, fetchedAt: new Date() },
     })
     .run();
 }

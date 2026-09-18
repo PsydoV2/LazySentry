@@ -28,33 +28,50 @@ afterAll(() => {
 
 describe('registry cache', () => {
   it('is a miss when nothing was ever cached', () => {
-    expect(getCached('npm', 'left-pad')).toEqual({ hit: false, latestVersion: null });
+    expect(getCached('npm', 'left-pad')).toEqual({
+      hit: false,
+      latestVersion: null,
+      license: null,
+    });
   });
 
-  it('returns a fresh cached version', () => {
-    setCached('npm', 'lodash', '4.18.1');
-    expect(getCached('npm', 'lodash')).toEqual({ hit: true, latestVersion: '4.18.1' });
+  it('returns a fresh cached version and license', () => {
+    setCached('npm', 'lodash', '4.18.1', 'MIT');
+    expect(getCached('npm', 'lodash')).toEqual({
+      hit: true,
+      latestVersion: '4.18.1',
+      license: 'MIT',
+    });
   });
 
-  it('caches a confirmed "not found" as a hit with a null version', () => {
-    setCached('npm', 'this-package-does-not-exist', null);
+  it('caches a confirmed "not found" as a hit with a null version and license', () => {
+    setCached('npm', 'this-package-does-not-exist', null, null);
     expect(getCached('npm', 'this-package-does-not-exist')).toEqual({
       hit: true,
       latestVersion: null,
+      license: null,
     });
   });
 
   it('treats an entry older than 24h as a miss', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2025-01-01T00:00:00Z'));
-    setCached('npm', 'lodash', '4.18.1');
+    setCached('npm', 'lodash', '4.18.1', 'MIT');
 
     vi.setSystemTime(new Date('2025-01-02T00:00:01Z')); // 24h + 1s later
-    expect(getCached('npm', 'lodash')).toEqual({ hit: false, latestVersion: null });
+    expect(getCached('npm', 'lodash')).toEqual({
+      hit: false,
+      latestVersion: null,
+      license: null,
+    });
   });
 
   it('keeps ecosystems separate for the same package name', () => {
-    setCached('npm', 'console', '1.0.0');
-    expect(getCached('Packagist', 'console')).toEqual({ hit: false, latestVersion: null });
+    setCached('npm', 'console', '1.0.0', 'MIT');
+    expect(getCached('Packagist', 'console')).toEqual({
+      hit: false,
+      latestVersion: null,
+      license: null,
+    });
   });
 });

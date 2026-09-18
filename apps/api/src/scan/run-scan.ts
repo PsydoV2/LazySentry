@@ -310,6 +310,7 @@ function persistDependencyResults(
             updateType: audit?.updateType ?? 'unknown',
             isDirect,
             sourceFile: result.source.path,
+            license: audit?.license ?? null,
           })
           .returning({ id: packages.id })
           .get();

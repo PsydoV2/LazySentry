@@ -197,6 +197,10 @@ export const packages = sqliteTable(
     updateType: text('update_type').notNull().default('unknown'),
     isDirect: integer('is_direct', { mode: 'boolean' }),
     sourceFile: text('source_file'),
+    // Raw declared license as reported by the registry (e.g. an SPDX
+    // expression) — null when the registry has none or the ecosystem isn't
+    // supported yet (docs/CONCEPT.md 2.5). Display only, no policy/allowlist.
+    license: text('license'),
   },
   (table) => [index('packages_scan_idx').on(table.scanId)],
 );
@@ -255,6 +259,9 @@ export const registryCache = sqliteTable(
     // Null means "looked up, but the registry had no answer" (e.g. 404) —
     // distinct from "never looked up" (no row at all).
     latestVersion: text('latest_version'),
+    // Declared license from the same registry response, cached alongside the
+    // version so license lookups never cost a second HTTP request (2.5).
+    license: text('license'),
     fetchedAt: integer('fetched_at', { mode: 'timestamp_ms' }).notNull(),
   },
   (table) => [

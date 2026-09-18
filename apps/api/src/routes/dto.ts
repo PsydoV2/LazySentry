@@ -108,6 +108,7 @@ export function toPackageDto(row: PackageRow): PackageEntry {
     updateType: row.updateType as PackageEntry['updateType'],
     isDirect: row.isDirect,
     sourceFile: row.sourceFile,
+    license: row.license,
   };
 }
 
