@@ -166,6 +166,13 @@ export interface Project {
   defaultBranch: string | null;
   isPrivate: boolean;
   addedAt: number;
+  /** Dashboard organization: pinned always outranks a section placement —
+   * the two are mutually exclusive, never both set. */
+  pinned: boolean;
+  sectionId: number | null;
+  /** Position within whichever group (pinned / this section / neither) the
+   * project currently belongs to — meaningless compared across groups. */
+  sortOrder: number;
   scanSecretsEnabled: boolean;
   verifySecretsEnabled: boolean;
   scanState: ScanState;
@@ -189,12 +196,54 @@ export interface Project {
 export interface ProjectSettingsUpdate {
   scanSecretsEnabled?: boolean;
   verifySecretsEnabled?: boolean;
+  /** Setting `pinned: true` clears any section placement, and setting a
+   * `sectionId` clears pinned — the two are mutually exclusive. */
+  pinned?: boolean;
+  sectionId?: number | null;
 }
 
 /** 202 response of POST /api/projects/:id/scans. */
 export interface ScanQueued {
   jobId: number;
   status: string;
+}
+
+// ---- dashboard organization: pin / sections / manual order ----
+
+/** A user-defined group on the homepage, collapsible and independently
+ * reorderable, sitting between the pinned projects and the leftover ones. */
+export interface ProjectSection {
+  id: number;
+  name: string;
+  sortOrder: number;
+  collapsed: boolean;
+}
+
+export interface SectionCreate {
+  name: string;
+}
+
+export interface SectionUpdate {
+  name?: string;
+  collapsed?: boolean;
+}
+
+/** POST /api/sections/reorder and POST /api/projects/reorder both take the
+ * new full ordering of one group's members as a plain id list. */
+export interface SectionReorder {
+  ids: number[];
+}
+
+/**
+ * The result of a drag-and-drop move: the complete new ordering of one
+ * target group — pinned, a specific section, or the leftover group when
+ * `sectionId` is null — as opposed to a delta for a single project, since a
+ * drop always repositions every member of the group it lands in.
+ */
+export interface ProjectReorder {
+  ids: number[];
+  pinned: boolean;
+  sectionId: number | null;
 }
 
 // ---- scans & findings ----

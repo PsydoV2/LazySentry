@@ -1,11 +1,12 @@
 import type { FastifyInstance } from 'fastify';
-import { desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { requireAuth, requireSameOrigin } from '../auth/session.js';
 import { db } from '../db/client.js';
 import {
   packages,
   projects,
+  projectSections,
   scans,
   secrets,
   vulnerabilities,
@@ -37,10 +38,44 @@ const settingsSchema = z
   .object({
     scanSecretsEnabled: z.boolean().optional(),
     verifySecretsEnabled: z.boolean().optional(),
+    // Dashboard organization (not in docs/CONCEPT.md). Mutually exclusive:
+    // applying one clears the other, enforced below rather than here since
+    // it depends on the project's current state.
+    pinned: z.boolean().optional(),
+    sectionId: z.number().int().positive().nullable().optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: 'No settings to update',
   });
+
+const reorderSchema = z
+  .object({
+    ids: z.array(z.number().int().positive()).min(1),
+    pinned: z.boolean().default(false),
+    sectionId: z.number().int().positive().nullable().default(null),
+  })
+  .refine((data) => !(data.pinned && data.sectionId !== null), {
+    message: 'A project cannot be pinned and placed in a section at the same time',
+  });
+
+/**
+ * Next free slot at the end of a dashboard group — used whenever a project's
+ * placement changes outside of drag-and-drop (pin toggle, move-to-section),
+ * which has no natural drop position of its own.
+ */
+function nextGroupSortOrder(pinned: boolean, sectionId: number | null): number {
+  const condition = pinned
+    ? eq(projects.pinned, true)
+    : sectionId !== null
+      ? eq(projects.sectionId, sectionId)
+      : and(eq(projects.pinned, false), isNull(projects.sectionId));
+  const row = db
+    .select({ max: sql<number | null>`max(${projects.sortOrder})` })
+    .from(projects)
+    .where(condition)
+    .get();
+  return (row?.max ?? -1) + 1;
+}
 
 type ProjectRow = typeof projects.$inferSelect;
 
@@ -94,13 +129,99 @@ export function registerProjectRoutes(app: FastifyInstance): void {
     const project = requireProject(request.params);
     const input = settingsSchema.parse(request.body);
 
+    const set: Partial<typeof projects.$inferInsert> = {};
+    if (input.scanSecretsEnabled !== undefined) {
+      set.scanSecretsEnabled = input.scanSecretsEnabled;
+    }
+    if (input.verifySecretsEnabled !== undefined) {
+      set.verifySecretsEnabled = input.verifySecretsEnabled;
+    }
+
+    // Pinned and sectioned are mutually exclusive placements — applying one
+    // clears the other rather than leaving stale state that only shows up
+    // once the project is un-pinned or removed from the section again.
+    let nextPinned = project.pinned;
+    let nextSectionId = project.sectionId;
+    if (input.pinned !== undefined) {
+      nextPinned = input.pinned;
+      if (input.pinned) nextSectionId = null;
+    }
+    if (input.sectionId !== undefined) {
+      nextSectionId = input.sectionId;
+      if (input.sectionId !== null) nextPinned = false;
+    }
+    if (input.sectionId != null) {
+      const section = db
+        .select()
+        .from(projectSections)
+        .where(eq(projectSections.id, input.sectionId))
+        .get();
+      if (!section) throw notFound('Section not found');
+    }
+    if (nextPinned !== project.pinned || nextSectionId !== project.sectionId) {
+      set.pinned = nextPinned;
+      set.sectionId = nextSectionId;
+      // No drop position to honor here (this is the pin button / a
+      // move-to-section menu action, not a drag), so land at the end.
+      set.sortOrder = nextGroupSortOrder(nextPinned, nextSectionId);
+    }
+
     const updated = db
       .update(projects)
-      .set(input)
+      .set(set)
       .where(eq(projects.id, project.id))
       .returning()
       .get();
     return toProjectDto(updated, scanStateFor(project.id));
+  });
+
+  /**
+   * Persists a drag-and-drop move: `ids` is the complete new ordering of one
+   * dashboard group (pinned, a specific section, or the leftover group when
+   * `sectionId` is null) — every listed project is placed in that group at
+   * its index, whether it was already there or is arriving from another
+   * group in the same drop.
+   */
+  app.post('/api/projects/reorder', async (request) => {
+    requireAuth(request);
+    requireSameOrigin(request);
+    const input = reorderSchema.parse(request.body);
+
+    if (input.sectionId !== null) {
+      const section = db
+        .select()
+        .from(projectSections)
+        .where(eq(projectSections.id, input.sectionId))
+        .get();
+      if (!section) throw notFound('Section not found');
+    }
+
+    const existing = new Set(
+      db.select({ id: projects.id }).from(projects).all().map((row) => row.id),
+    );
+    for (const id of input.ids) {
+      if (!existing.has(id)) throw notFound(`Project ${id} not found`);
+    }
+
+    db.transaction((tx) => {
+      input.ids.forEach((id, index) => {
+        tx.update(projects)
+          .set({ pinned: input.pinned, sectionId: input.sectionId, sortOrder: index })
+          .where(eq(projects.id, id))
+          .run();
+      });
+    });
+
+    const states = scanStatesByProject();
+    return selectProjectsWithLastScanError()
+      .all()
+      .map((row) =>
+        toProjectDto(
+          row.project,
+          states.get(row.project.id) ?? 'idle',
+          row.lastScanErrorMessage,
+        ),
+      );
   });
 
   app.get('/api/projects/:id/scans', async (request) => {

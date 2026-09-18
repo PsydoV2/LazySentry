@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { toProjectDto, toScanDto, toSecretDto, toVulnerabilityDto } from './dto.js';
-import type { packages, projects, scans, secrets, vulnerabilities } from '../db/schema.js';
+import { toProjectDto, toScanDto, toSecretDto, toSectionDto, toVulnerabilityDto } from './dto.js';
+import type {
+  packages,
+  projects,
+  projectSections,
+  scans,
+  secrets,
+  vulnerabilities,
+} from '../db/schema.js';
 
 const scannedAt = new Date('2026-09-11T10:00:00.000Z');
 
@@ -14,6 +21,9 @@ const projectRow: typeof projects.$inferSelect = {
   cloneUrl: 'https://github.com/acme/demo',
   isPrivate: false,
   addedAt: new Date('2026-09-01T00:00:00.000Z'),
+  pinned: false,
+  sectionId: null,
+  sortOrder: 0,
   scanSecretsEnabled: true,
   verifySecretsEnabled: false,
   lastScanId: 7,
@@ -148,5 +158,26 @@ describe('response mapping', () => {
     expect(dto['redacted']).toBe('AKIA…IFXG');
     expect(dto['fingerprint']).toBeUndefined();
     expect(dto['commitDate']).toBe(scannedAt.getTime());
+  });
+
+  it('carries dashboard organization placement', () => {
+    const dto = toProjectDto({ ...projectRow, pinned: true, sectionId: 3, sortOrder: 2 }, 'idle');
+    expect(dto.pinned).toBe(true);
+    expect(dto.sectionId).toBe(3);
+    expect(dto.sortOrder).toBe(2);
+  });
+
+  it('maps a section row without leaking anything beyond its public fields', () => {
+    const sectionRow: typeof projectSections.$inferSelect = {
+      id: 5,
+      name: 'Backend',
+      sortOrder: 1,
+      collapsed: true,
+      createdAt: scannedAt,
+    };
+    const dto = toSectionDto(sectionRow) as Record<string, unknown>;
+    expect(dto['name']).toBe('Backend');
+    expect(dto['collapsed']).toBe(true);
+    expect(dto['createdAt']).toBeUndefined();
   });
 });

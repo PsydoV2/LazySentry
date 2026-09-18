@@ -259,6 +259,29 @@ export function IconFolder(props: IconProps) {
   );
 }
 
+export function IconPin(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M9 4.5h6" />
+      <path d="M10 4.5v4.2c0 .8-.3 1.5-.9 2.1l-1.6 1.7c-.4.4-.6.9-.6 1.5v1h10v-1c0-.6-.2-1.1-.6-1.5l-1.6-1.7a3 3 0 0 1-.9-2.1V4.5" />
+      <path d="M12 15v6" />
+    </svg>
+  );
+}
+
+export function IconGripVertical(props: IconProps) {
+  return (
+    <svg {...base(props)} strokeWidth={0} fill="currentColor" viewBox="0 0 24 24">
+      <circle cx="9" cy="6" r="1.6" />
+      <circle cx="9" cy="12" r="1.6" />
+      <circle cx="9" cy="18" r="1.6" />
+      <circle cx="15" cy="6" r="1.6" />
+      <circle cx="15" cy="12" r="1.6" />
+      <circle cx="15" cy="18" r="1.6" />
+    </svg>
+  );
+}
+
 export function IconTrash(props: IconProps) {
   return (
     <svg {...base(props)}>

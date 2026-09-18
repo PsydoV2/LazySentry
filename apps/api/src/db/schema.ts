@@ -80,10 +80,35 @@ export interface ScanJobPayload {
   fullRescan?: boolean;
 }
 
+/**
+ * User-defined dashboard groups (not in docs/CONCEPT.md — a homepage
+ * organization feature layered on top of the urgency-sorted grid). A
+ * project belongs to at most one section, and never both a section and
+ * pinned at once — pinning always wins the top slot, so the two placements
+ * are kept mutually exclusive rather than tracked as overlapping state.
+ */
+export const projectSections = sqliteTable('project_sections', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  sortOrder: integer('sort_order').notNull().default(0),
+  collapsed: integer('collapsed', { mode: 'boolean' }).notNull().default(false),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+});
+
 export const projects = sqliteTable(
   'projects',
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
+    // Dashboard organization (see projectSections above). `sortOrder` is
+    // only meaningful relative to the other projects sharing this project's
+    // current placement (pinned, a given section, or neither) — it is
+    // reassigned to the target group's next slot whenever pinned/sectionId
+    // changes, never compared across groups.
+    pinned: integer('pinned', { mode: 'boolean' }).notNull().default(false),
+    sectionId: integer('section_id').references(() => projectSections.id, {
+      onDelete: 'set null',
+    }),
+    sortOrder: integer('sort_order').notNull().default(0),
     // Null only for the hardcoded step-1 development project.
     gitAccountId: integer('git_account_id').references(() => gitAccounts.id, {
       onDelete: 'cascade',
@@ -125,6 +150,7 @@ export const projects = sqliteTable(
       table.gitAccountId,
       table.providerRepoId,
     ),
+    index('projects_section_idx').on(table.sectionId),
   ],
 );
 

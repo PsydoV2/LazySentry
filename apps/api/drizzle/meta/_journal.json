@@ -50,6 +50,13 @@
       "when": 1789315005121,
       "tag": "0006_late_dormammu",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1789727964809,
+      "tag": "0007_glossy_exodus",
+      "breakpoints": true
     }
   ]
 }

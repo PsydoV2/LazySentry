@@ -840,14 +840,178 @@ button:disabled {
    from a fixed aspect-ratio — the card only grows taller than its minimum
    when a project has enough pills to wrap onto a second line. */
 
+/* ---------- homepage organization: pinned / sections / drag-and-drop ---------- */
+
+.dashboard-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.dashboard-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.dashboard-group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dashboard-group-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.dashboard-group-icon {
+  width: 14px;
+  height: 14px;
+  color: var(--accent);
+}
+
 .project-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 420px));
   justify-content: start;
   gap: var(--space-4);
+  border-radius: var(--radius-lg);
+  transition: outline-color 0.1s;
+}
+
+/* Hovering empty grid space while dragging a card — "drop here = append to
+   the end of this group". */
+.project-grid.drop-append {
+  outline: 2px dashed var(--accent);
+  outline-offset: 6px;
+}
+
+.project-drag-item {
+  cursor: grab;
+}
+
+.project-drag-item.is-dragging {
+  opacity: 0.4;
+}
+
+/* Hovering a specific card while dragging another one — "drop here =
+   insert before this card". A left-edge bar rather than moving the layout
+   around on every pixel of mouse movement. */
+.project-drag-item.drop-before {
+  box-shadow: -3px 0 0 var(--accent);
+  border-radius: var(--radius-lg);
+}
+
+.section-empty-drop {
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  text-align: center;
+  color: var(--text-subtle);
+  font-size: 13px;
+}
+
+.section-empty-drop.drop-append {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 4px 6px;
+  border-radius: var(--radius);
+}
+
+.section-header.drop-before {
+  box-shadow: 0 -3px 0 var(--accent);
+}
+
+.section-header.is-dragging {
+  opacity: 0.4;
+}
+
+.section-header-confirm {
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  padding: var(--space-2) var(--space-3);
+}
+
+.section-header-confirm .btn-danger,
+.section-header-confirm .btn-secondary {
+  padding: 4px 10px;
+  font-size: 12.5px;
+}
+
+.section-drag-handle {
+  display: flex;
+  align-items: center;
+  color: var(--text-subtle);
+  cursor: grab;
+}
+
+.section-collapse-btn svg {
+  transition: transform 0.15s;
+}
+
+.section-collapse-btn.is-collapsed svg {
+  transform: rotate(-90deg);
+}
+
+.section-name-btn {
+  padding: 2px 6px;
+  border-radius: var(--radius);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.section-name-btn:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.section-name-input {
+  width: auto;
+  min-width: 120px;
+  padding: 3px 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.section-count {
+  font-size: 11px;
+}
+
+.section-delete-btn {
+  margin-left: auto;
+}
+
+.add-section-btn {
+  align-self: flex-start;
+}
+
+.add-section-form {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.add-section-form input[type="text"] {
+  width: auto;
+  min-width: 220px;
 }
 
 .project-card {
+  position: relative;
   min-height: 108px;
   text-align: left;
   display: flex;
@@ -858,6 +1022,25 @@ button:disabled {
   padding: var(--space-4);
   cursor: pointer;
   transition: border-color 0.15s;
+}
+
+.project-card-pin-badge {
+  position: absolute;
+  top: -7px;
+  left: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+}
+
+.project-card-pin-badge svg {
+  width: 11px;
+  height: 11px;
 }
 
 .project-card:hover {
@@ -1076,6 +1259,18 @@ button:disabled {
 .card-icon-btn:hover:not(:disabled) {
   color: var(--text);
   background: var(--bg);
+}
+
+/* Per-card overflow menu (pin / move to section) — same floating dropdown
+   as .user-menu-dropdown, just anchored to a relatively-positioned wrapper
+   inline in the card's action row instead of a fixed corner avatar. */
+.organize-menu {
+  position: relative;
+  display: flex;
+}
+
+.organize-menu-dropdown {
+  min-width: 200px;
 }
 
 /* Top-right scan control: a green "run" button that turns into a spinner

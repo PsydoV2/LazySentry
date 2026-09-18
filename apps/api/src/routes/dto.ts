@@ -7,6 +7,7 @@
 import type {
   PackageEntry,
   Project,
+  ProjectSection,
   ScanState,
   Scan,
   Secret,
@@ -15,12 +16,14 @@ import type {
 import type {
   packages,
   projects,
+  projectSections,
   scans,
   secrets,
   vulnerabilities,
 } from '../db/schema.js';
 
 type ProjectRow = typeof projects.$inferSelect;
+type ProjectSectionRow = typeof projectSections.$inferSelect;
 type ScanRow = typeof scans.$inferSelect;
 type PackageRow = typeof packages.$inferSelect;
 type VulnerabilityRow = typeof vulnerabilities.$inferSelect;
@@ -44,6 +47,9 @@ export function toProjectDto(
     defaultBranch: row.defaultBranch,
     isPrivate: row.isPrivate,
     addedAt: row.addedAt.getTime(),
+    pinned: row.pinned,
+    sectionId: row.sectionId,
+    sortOrder: row.sortOrder,
     scanSecretsEnabled: row.scanSecretsEnabled,
     verifySecretsEnabled: row.verifySecretsEnabled,
     scanState,
@@ -61,6 +67,15 @@ export function toProjectDto(
     countOutdatedMinor: row.countOutdatedMinor,
     countOutdatedPatch: row.countOutdatedPatch,
     lastScannedCommitSha: row.lastScannedCommitSha,
+  };
+}
+
+export function toSectionDto(row: ProjectSectionRow): ProjectSection {
+  return {
+    id: row.id,
+    name: row.name,
+    sortOrder: row.sortOrder,
+    collapsed: row.collapsed,
   };
 }
 
