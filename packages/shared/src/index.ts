@@ -246,6 +246,22 @@ export interface ProjectReorder {
   sectionId: number | null;
 }
 
+// ---- instance settings (roadmap Phase 3, docs/CONCEPT.md 2.3) ----
+
+/** GET /api/settings — the webhook URL itself is never returned, same as a
+ * connected account's token (docs/CONCEPT.md 4.2). */
+export interface AppSettings {
+  discordWebhookConfigured: boolean;
+  /** 0 = disabled — one global interval for every project (§2.3 decision). */
+  scanScheduleIntervalHours: number;
+}
+
+export interface AppSettingsUpdate {
+  /** `null` clears a previously configured webhook. */
+  discordWebhookUrl?: string | null;
+  scanScheduleIntervalHours?: number;
+}
+
 // ---- scans & findings ----
 
 export interface Scan {
@@ -292,6 +308,10 @@ export interface Vulnerability {
   firstSeenScanId: number;
   lastSeenScanId: number;
   resolvedAt: number | null;
+  /** User-driven mute (Phase 3) — distinct from `status`, which reconciliation
+   * alone controls. Set means excluded from dashboard counts and notifications
+   * until explicitly cleared. */
+  suppressedAt: number | null;
   // Denormalized from the package this vulnerability was found in, so the
   // dependencies table does not need a second request to name it.
   packageName: string | null;
@@ -316,6 +336,13 @@ export interface Secret {
   firstSeenScanId: number;
   lastSeenScanId: number;
   resolvedAt: number | null;
+  /** User-driven mute (Phase 3) — see the identical field on Vulnerability. */
+  suppressedAt: number | null;
+}
+
+/** PATCH /api/projects/:id/vulnerabilities/:vulnId and the secrets equivalent. */
+export interface SuppressionUpdate {
+  suppressed: boolean;
 }
 
 // ---- live updates (docs/CONCEPT.md 3.5) ----

@@ -57,6 +57,8 @@ export const api = {
 // the API can never drift apart on a response shape (docs/CONCEPT.md 0, 3.4).
 
 export type {
+  AppSettings,
+  AppSettingsUpdate,
   ConnectResult,
   CurrentUser,
   FindingStatus,
@@ -85,6 +87,7 @@ export type {
   SectionUpdate,
   SetupStatus,
   Severity,
+  SuppressionUpdate,
   UpdateType,
   VersionInfo,
   Vulnerability,

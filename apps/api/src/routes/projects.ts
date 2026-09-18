@@ -13,6 +13,7 @@ import {
 } from '../db/schema.js';
 import { conflict, notFound } from '../lib/errors.js';
 import { cancelScanJob, enqueueScanJob, hasActiveScanJob } from '../queue/jobs.js';
+import { recomputeOpenFindingCounts } from '../scan/run-scan.js';
 import { scanStateFor, scanStatesByProject } from '../scan/scan-state.js';
 import {
   toPackageDto,
@@ -23,6 +24,9 @@ import {
 } from './dto.js';
 
 const projectIdParams = z.object({ id: z.coerce.number().int().positive() });
+const vulnIdParams = z.object({ vulnId: z.coerce.number().int().positive() });
+const secretIdParams = z.object({ secretId: z.coerce.number().int().positive() });
+const suppressionSchema = z.object({ suppressed: z.boolean() });
 
 const triggerScanSchema = z
   .object({
@@ -345,5 +349,72 @@ export function registerProjectRoutes(app: FastifyInstance): void {
       .orderBy(desc(secrets.isVerified), desc(secrets.id))
       .all()
       .map(toSecretDto);
+  });
+
+  /**
+   * Suppression (roadmap Phase 3, docs/CONCEPT.md 2.3): a durable per-finding
+   * mute, distinct from the scan-reconciliation-driven `status`. Recomputes
+   * the project's denormalized counters immediately so the dashboard card
+   * reflects the change without waiting for the next scan.
+   */
+  app.patch('/api/projects/:id/vulnerabilities/:vulnId', async (request) => {
+    requireAuth(request);
+    requireSameOrigin(request);
+    const project = requireProject(request.params);
+    const { vulnId } = vulnIdParams.parse(request.params);
+    const input = suppressionSchema.parse(request.body);
+
+    const vuln = db
+      .select()
+      .from(vulnerabilities)
+      .where(and(eq(vulnerabilities.id, vulnId), eq(vulnerabilities.projectId, project.id)))
+      .get();
+    if (!vuln) throw notFound('Vulnerability not found');
+
+    const updated = db
+      .update(vulnerabilities)
+      .set({ suppressedAt: input.suppressed ? new Date() : null })
+      .where(eq(vulnerabilities.id, vulnId))
+      .returning()
+      .get();
+
+    db.update(projects)
+      .set(recomputeOpenFindingCounts(project.id))
+      .where(eq(projects.id, project.id))
+      .run();
+
+    const pkg = updated.packageId
+      ? (db.select().from(packages).where(eq(packages.id, updated.packageId)).get() ?? null)
+      : null;
+    return toVulnerabilityDto(updated, pkg);
+  });
+
+  app.patch('/api/projects/:id/secrets/:secretId', async (request) => {
+    requireAuth(request);
+    requireSameOrigin(request);
+    const project = requireProject(request.params);
+    const { secretId } = secretIdParams.parse(request.params);
+    const input = suppressionSchema.parse(request.body);
+
+    const secret = db
+      .select()
+      .from(secrets)
+      .where(and(eq(secrets.id, secretId), eq(secrets.projectId, project.id)))
+      .get();
+    if (!secret) throw notFound('Secret not found');
+
+    const updated = db
+      .update(secrets)
+      .set({ suppressedAt: input.suppressed ? new Date() : null })
+      .where(eq(secrets.id, secretId))
+      .returning()
+      .get();
+
+    db.update(projects)
+      .set(recomputeOpenFindingCounts(project.id))
+      .where(eq(projects.id, project.id))
+      .run();
+
+    return toSecretDto(updated);
   });
 }

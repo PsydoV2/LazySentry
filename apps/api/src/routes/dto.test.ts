@@ -117,6 +117,7 @@ describe('response mapping', () => {
       lastSeenScanId: 7,
       resolvedScanId: null,
       resolvedAt: null,
+      suppressedAt: null,
     };
     const packageRow: Pick<
       typeof packages.$inferSelect,
@@ -132,6 +133,30 @@ describe('response mapping', () => {
     const withoutPackage = toVulnerabilityDto(vulnRow, null);
     expect(withoutPackage.packageName).toBeNull();
     expect(withoutPackage.osvId).toBe('GHSA-xxxx');
+  });
+
+  it('carries a vulnerability suppression timestamp', () => {
+    const suppressedAt = new Date('2026-09-12T00:00:00.000Z');
+    const vulnRow: typeof vulnerabilities.$inferSelect = {
+      id: 3,
+      projectId: 1,
+      packageId: 9,
+      osvId: 'GHSA-xxxx',
+      aliases: [],
+      severity: 'high',
+      cvssScore: 8.1,
+      summary: null,
+      fixedVersion: null,
+      publishedAt: null,
+      fingerprint: 'fp',
+      status: 'open',
+      firstSeenScanId: 7,
+      lastSeenScanId: 7,
+      resolvedScanId: null,
+      resolvedAt: null,
+      suppressedAt,
+    };
+    expect(toVulnerabilityDto(vulnRow, null).suppressedAt).toBe(suppressedAt.getTime());
   });
 
   it('exposes only the masked secret preview, never a fingerprint', () => {
@@ -152,12 +177,37 @@ describe('response mapping', () => {
       lastSeenScanId: 7,
       resolvedScanId: null,
       resolvedAt: null,
+      suppressedAt: null,
     };
     const dto = toSecretDto(secretRow) as Record<string, unknown>;
 
     expect(dto['redacted']).toBe('AKIA…IFXG');
     expect(dto['fingerprint']).toBeUndefined();
     expect(dto['commitDate']).toBe(scannedAt.getTime());
+  });
+
+  it('carries a secret suppression timestamp', () => {
+    const suppressedAt = new Date('2026-09-12T00:00:00.000Z');
+    const secretRow: typeof secrets.$inferSelect = {
+      id: 2,
+      projectId: 1,
+      detectorType: 'AWS',
+      filePath: 'config/dev.env',
+      commitSha: 'deadbeef',
+      line: 12,
+      isVerified: true,
+      redacted: 'AKIA…IFXG',
+      fingerprint: 'fp',
+      status: 'open',
+      commitAuthor: null,
+      commitDate: null,
+      firstSeenScanId: 7,
+      lastSeenScanId: 7,
+      resolvedScanId: null,
+      resolvedAt: null,
+      suppressedAt,
+    };
+    expect(toSecretDto(secretRow).suppressedAt).toBe(suppressedAt.getTime());
   });
 
   it('carries dashboard organization placement', () => {

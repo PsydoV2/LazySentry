@@ -135,6 +135,7 @@ export function toVulnerabilityDto(
     firstSeenScanId: row.firstSeenScanId,
     lastSeenScanId: row.lastSeenScanId,
     resolvedAt: ms(row.resolvedAt),
+    suppressedAt: ms(row.suppressedAt),
     packageName: pkg?.name ?? null,
     packageEcosystem: pkg?.ecosystem ?? null,
     packageVersion: pkg?.versionInstalled ?? null,
@@ -159,5 +160,6 @@ export function toSecretDto(row: SecretRow): Secret {
     firstSeenScanId: row.firstSeenScanId,
     lastSeenScanId: row.lastSeenScanId,
     resolvedAt: ms(row.resolvedAt),
+    suppressedAt: ms(row.suppressedAt),
   };
 }

@@ -1,7 +1,7 @@
 // Executes one scan end-to-end: clone → trufflehog → osv-scanner → persist +
 // reconcile (docs/CONCEPT.md 5.1, 4.1).
 
-import { and, eq, ne, sql } from 'drizzle-orm';
+import { and, eq, isNull, ne, sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import {
   packages,
@@ -12,6 +12,7 @@ import {
   type ScanJobPayload,
 } from '../db/schema.js';
 import { secretFingerprint, vulnerabilityFingerprint } from '../lib/fingerprint.js';
+import { notifyScanResult } from '../notifications/scan-notifications.js';
 import { redactSecret } from '../lib/redact.js';
 import { classifySeverity } from '../lib/severity.js';
 import {
@@ -250,6 +251,10 @@ export async function runScan(
     hasFreshPackageInventory: depsStatus === 'completed',
   });
 
+  // Runs after reconciliation has committed, so firstSeenScanId = scanId is
+  // queryable, and never throws — a broken webhook must not fail this job.
+  await notifyScanResult(project, scanId, status);
+
   return { scanId, status };
 }
 
@@ -442,14 +447,22 @@ function persistSecretResults(
   });
 }
 
-function updateProjectAfterScan(
-  projectId: number,
-  scanId: number,
-  status: string,
-  finishedAt: Date,
-  commitSha: string | null,
-  options: { hasFreshPackageInventory: boolean },
-): void {
+/**
+ * Open, non-suppressed finding counts for a project's dashboard card
+ * (docs/CONCEPT.md 8.1). Suppressed findings (Phase 3 mute) are excluded so a
+ * muted finding neither shows up in the counters nor drives card urgency.
+ * Shared by the post-scan update below and by the suppression toggle routes,
+ * so a suppress/unsuppress action updates the dashboard immediately instead
+ * of waiting for the next scan.
+ */
+export function recomputeOpenFindingCounts(projectId: number): {
+  countVulnCritical: number;
+  countVulnHigh: number;
+  countVulnMedium: number;
+  countVulnLow: number;
+  countSecretsVerified: number;
+  countSecretsUnknown: number;
+} {
   const counts = db
     .select({
       severity: vulnerabilities.severity,
@@ -460,6 +473,7 @@ function updateProjectAfterScan(
       and(
         eq(vulnerabilities.projectId, projectId),
         eq(vulnerabilities.status, 'open'),
+        isNull(vulnerabilities.suppressedAt),
       ),
     )
     .groupBy(vulnerabilities.severity)
@@ -472,11 +486,37 @@ function updateProjectAfterScan(
       count: sql<number>`count(*)`,
     })
     .from(secrets)
-    .where(and(eq(secrets.projectId, projectId), eq(secrets.status, 'open')))
+    .where(
+      and(
+        eq(secrets.projectId, projectId),
+        eq(secrets.status, 'open'),
+        isNull(secrets.suppressedAt),
+      ),
+    )
     .groupBy(secrets.isVerified)
     .all();
   const verifiedCount = secretCounts.find((c) => c.isVerified)?.count ?? 0;
   const unknownCount = secretCounts.find((c) => !c.isVerified)?.count ?? 0;
+
+  return {
+    countVulnCritical: bySeverity['critical'] ?? 0,
+    countVulnHigh: bySeverity['high'] ?? 0,
+    countVulnMedium: bySeverity['medium'] ?? 0,
+    countVulnLow: bySeverity['low'] ?? 0,
+    countSecretsVerified: verifiedCount,
+    countSecretsUnknown: unknownCount,
+  };
+}
+
+function updateProjectAfterScan(
+  projectId: number,
+  scanId: number,
+  status: string,
+  finishedAt: Date,
+  commitSha: string | null,
+  options: { hasFreshPackageInventory: boolean },
+): void {
+  const openFindingCounts = recomputeOpenFindingCounts(projectId);
 
   // Packages aren't reconciled across scans the way findings are (5.4/4.1) —
   // each scan's rows are its own inventory snapshot — so "outdated" counts
@@ -510,12 +550,7 @@ function updateProjectAfterScan(
       lastScanId: scanId,
       lastScanAt: finishedAt,
       lastScanStatus: status,
-      countVulnCritical: bySeverity['critical'] ?? 0,
-      countVulnHigh: bySeverity['high'] ?? 0,
-      countVulnMedium: bySeverity['medium'] ?? 0,
-      countVulnLow: bySeverity['low'] ?? 0,
-      countSecretsVerified: verifiedCount,
-      countSecretsUnknown: unknownCount,
+      ...openFindingCounts,
       ...outdatedCounts,
       ...(commitSha ? { lastScannedCommitSha: commitSha } : {}),
     })

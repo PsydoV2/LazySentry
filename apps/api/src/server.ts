@@ -21,6 +21,7 @@ import { registerEventRoutes } from './routes/events.js';
 import { registerGitAccountRoutes } from './routes/git-accounts.js';
 import { registerProjectRoutes } from './routes/projects.js';
 import { registerSectionRoutes } from './routes/sections.js';
+import { registerSettingsRoutes } from './routes/settings.js';
 import { registerSetupRoutes } from './routes/setup.js';
 import { registerVersionRoutes } from './routes/version.js';
 
@@ -87,6 +88,7 @@ export async function startApi(): Promise<FastifyInstance> {
   registerGitAccountRoutes(app);
   registerProjectRoutes(app);
   registerSectionRoutes(app);
+  registerSettingsRoutes(app);
   registerVersionRoutes(app);
 
   // Scan progress reaches the browser over SSE; the worker's status changes are
