@@ -70,12 +70,6 @@ export function Dashboard({
     onSuccess: replaceProject,
   });
 
-  const moveToSection = useMutation({
-    mutationFn: ({ project, sectionId }: { project: Project; sectionId: number | null }) =>
-      api.patch<Project>(`/api/projects/${project.id}`, { sectionId }),
-    onSuccess: replaceProject,
-  });
-
   const reorderProjects = useMutation({
     mutationFn: (body: { ids: number[]; pinned: boolean; sectionId: number | null }) =>
       api.post<Project[]>('/api/projects/reorder', body),
@@ -150,7 +144,6 @@ export function Dashboard({
   const renderCard = (project: Project) => (
     <ProjectCard
       project={project}
-      sections={allSections}
       onOpen={() => navigate({ name: 'project', id: project.id })}
       onOpenSettings={() =>
         navigate({ name: 'project', id: project.id, tab: 'settings' })
@@ -158,7 +151,6 @@ export function Dashboard({
       onScanNow={() => triggerScan.mutate(project.id)}
       onCancelScan={() => cancelScan.mutate(project.id)}
       onTogglePin={() => togglePin.mutate(project)}
-      onMoveToSection={(sectionId) => moveToSection.mutate({ project, sectionId })}
       scanDisabled={triggerScan.isPending}
     />
   );
@@ -234,9 +226,7 @@ export function Dashboard({
                 />
               }
               emptyPlaceholder={
-                section.collapsed ? undefined : (
-                  <span>Drag projects here, or use a card's organize menu.</span>
-                )
+                section.collapsed ? undefined : <span>Drag projects here.</span>
               }
             />
           ))}

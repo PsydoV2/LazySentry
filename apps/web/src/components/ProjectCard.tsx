@@ -5,10 +5,9 @@
 // wherever a glance should be enough.
 
 import type { ComponentType, MouseEvent } from 'react';
-import type { Project, ProjectSection } from '@lazysentry/shared';
+import type { Project } from '@lazysentry/shared';
 import { cardStateFor, urgencyRank, type CardState } from '../lib/card-state';
 import { relativeTime } from '../lib/format';
-import { ProjectOrganizeMenu } from './ProjectOrganizeMenu';
 import {
   IconAlertTriangle,
   IconBug,
@@ -45,23 +44,19 @@ function ownerOf(fullName: string): string {
 
 export function ProjectCard({
   project,
-  sections,
   onOpen,
   onOpenSettings,
   onScanNow,
   onCancelScan,
   onTogglePin,
-  onMoveToSection,
   scanDisabled,
 }: {
   project: Project;
-  sections: ProjectSection[];
   onOpen: () => void;
   onOpenSettings: () => void;
   onScanNow: () => void;
   onCancelScan: () => void;
   onTogglePin: () => void;
-  onMoveToSection: (sectionId: number | null) => void;
   scanDisabled: boolean;
 }) {
   const state = cardStateFor(project);
@@ -123,12 +118,6 @@ export function ProjectCard({
           >
             <IconSettings />
           </button>
-          <ProjectOrganizeMenu
-            project={project}
-            sections={sections}
-            onTogglePin={onTogglePin}
-            onMoveToSection={onMoveToSection}
-          />
           <button
             type="button"
             className={`card-icon-btn pin-toggle-btn${project.pinned ? ' is-pinned' : ''}`}

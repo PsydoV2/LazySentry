@@ -1279,18 +1279,6 @@ button:disabled {
   transform: rotate(45deg);
 }
 
-/* Per-card overflow menu (pin / move to section) — same floating dropdown
-   as .user-menu-dropdown, just anchored to a relatively-positioned wrapper
-   inline in the card's action row instead of a fixed corner avatar. */
-.organize-menu {
-  position: relative;
-  display: flex;
-}
-
-.organize-menu-dropdown {
-  min-width: 200px;
-}
-
 /* Top-right scan control: a green "run" button that turns into a spinner
    while a scan is queued/running, which itself turns into a stop button on
    hover — same interaction Jenkins uses for its build spinners. */
