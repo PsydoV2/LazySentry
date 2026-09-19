@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 96" width="340" height="96" role="img" aria-label="LazySentry">
   <defs>
     <linearGradient id="g" x1="10" y1="4" x2="90" y2="114" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#c4b5fd"/>
-      <stop offset="1" stop-color="#8b5cf6"/>
+      <stop offset="0" stop-color="#a78bfa"/>
+      <stop offset="1" stop-color="#6d28d9"/>
     </linearGradient>
     <clipPath id="shieldClip">
       <path d="M50 8 L18 22 V50 C18 76 32 94 50 106 C68 94 82 76 82 50 V22 L50 8 Z"/>
@@ -17,7 +17,7 @@
       <circle cx="74" cy="26" r="8" fill="none" stroke="#ffffff" stroke-width="2.8" opacity="0.95"/>
       <circle cx="74" cy="26" r="2.5" fill="#ffffff"/>
       <path d="M26 58 Q50 38 74 58 Q50 72 26 58 Z" fill="#ffffff"/>
-      <circle cx="50" cy="58" r="6" fill="#2e1065"/>
+      <circle cx="50" cy="58" r="6" fill="#4c1d95"/>
       <circle cx="52.5" cy="55.5" r="1.5" fill="#ffffff"/>
     </g>
   </g>
