@@ -430,7 +430,7 @@ Diese Richtlinien gelten für alle Ansichten (Dashboard, Detailseite, Setup-Wiza
 │   sebastian/my-project · PHP         │
 │                                      │
 │   🔴 2 verified secrets              │
-│   🟠 5 vulnerabilities (1 critical)  │
+│   🔴 5 vulnerabilities (1 critical)  │
 │   🔵 12 outdated (3 major)           │
 │                                      │
 │   Last scan 2 hours ago              │
@@ -442,11 +442,11 @@ Diese Richtlinien gelten für alle Ansichten (Dashboard, Detailseite, Setup-Wiza
 **Card-Farbe = Dringlichkeit, nicht Severity.** Die Priorität lautet:
 
 1. Verifiziertes Secret → rot, unabhängig von allem anderen
-2. Kritische Vulnerability → orange
+2. Kritische Vulnerability → ebenfalls rot (sofortiger Handlungsbedarf), aber niedriger sortiert als ein verifiziertes Secret
 3. Sonstige Vulnerabilities / veraltete Pakete → blau
 4. Nichts gefunden → grün
 
-Ein aktiver AWS-Key im Repository ist dringender als drei kritische CVEs in einer Dev-Dependency. Die Sortierung des Grids folgt derselben Logik: das Dringendste oben links.
+Ein aktiver AWS-Key im Repository ist dringender als drei kritische CVEs in einer Dev-Dependency — deshalb sortiert er vor ihnen, auch wenn beide Zustände als rot signalisiert werden. Die Sortierung des Grids folgt derselben Logik: das Dringendste oben links.
 
 ### 8.2 Projekt-Detailansicht
 

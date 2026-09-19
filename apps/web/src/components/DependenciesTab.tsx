@@ -7,7 +7,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EmptyState } from './EmptyState';
 import { Select } from './Select';
 import { api, type PackageEntry, type Project, type Vulnerability } from '../lib/api';
-import { IconAlertTriangle, IconBug, IconChevronDown, IconFolder, IconPackage } from './icons';
+import {
+  IconAlertTriangle,
+  IconBug,
+  IconChevronDown,
+  IconFilter,
+  IconFilterFilled,
+  IconFolder,
+  IconPackage,
+} from './icons';
 
 type SortKey = 'name' | 'ecosystem' | 'versionInstalled' | 'updateType' | 'vulnerabilities';
 
@@ -43,6 +51,7 @@ export function DependenciesTab({ project }: { project: Project }) {
   const [directOnly, setDirectOnly] = useState(false);
   const [vulnerableOnly, setVulnerableOnly] = useState(false);
   const [showSuppressed, setShowSuppressed] = useState(false);
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [expanded, setExpanded] = useState<number | null>(null);
 
@@ -177,30 +186,46 @@ export function DependenciesTab({ project }: { project: Project }) {
             onChange={setEcosystem}
           />
         )}
-        <label className="row" style={{ gap: 6 }}>
-          <input
-            type="checkbox"
-            checked={directOnly}
-            onChange={(event) => setDirectOnly(event.target.checked)}
-          />
-          Direct only
-        </label>
-        <label className="row" style={{ gap: 6 }}>
-          <input
-            type="checkbox"
-            checked={vulnerableOnly}
-            onChange={(event) => setVulnerableOnly(event.target.checked)}
-          />
-          Vulnerable only
-        </label>
-        <label className="row" style={{ gap: 6 }}>
-          <input
-            type="checkbox"
-            checked={showSuppressed}
-            onChange={(event) => setShowSuppressed(event.target.checked)}
-          />
-          Show suppressed
-        </label>
+        <button
+          type="button"
+          className={`card-icon-btn filter-toggle-btn${
+            directOnly || vulnerableOnly || showSuppressed ? ' has-active-filters' : ''
+          }`}
+          title="More filters"
+          aria-label="Toggle more filters"
+          aria-pressed={moreFiltersOpen}
+          onClick={() => setMoreFiltersOpen((open) => !open)}
+        >
+          {moreFiltersOpen ? <IconFilterFilled /> : <IconFilter />}
+        </button>
+        {moreFiltersOpen && (
+          <>
+            <label className="row" style={{ gap: 6 }}>
+              <input
+                type="checkbox"
+                checked={directOnly}
+                onChange={(event) => setDirectOnly(event.target.checked)}
+              />
+              Direct only
+            </label>
+            <label className="row" style={{ gap: 6 }}>
+              <input
+                type="checkbox"
+                checked={vulnerableOnly}
+                onChange={(event) => setVulnerableOnly(event.target.checked)}
+              />
+              Vulnerable only
+            </label>
+            <label className="row" style={{ gap: 6 }}>
+              <input
+                type="checkbox"
+                checked={showSuppressed}
+                onChange={(event) => setShowSuppressed(event.target.checked)}
+              />
+              Show suppressed
+            </label>
+          </>
+        )}
         {filtersActive && (
           <button
             type="button"

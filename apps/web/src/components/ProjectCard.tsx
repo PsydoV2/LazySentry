@@ -29,7 +29,7 @@ import {
 
 const STATE_COLOR: Record<number, string> = {
   0: 'var(--signal-critical)',
-  1: 'var(--signal-high)',
+  1: 'var(--signal-critical)',
   2: 'var(--signal-info)',
   3: 'var(--signal-ok)',
   4: 'var(--signal-critical)',
@@ -337,7 +337,7 @@ function FindingPills({ project, state }: { project: Project; state: CardState }
   if (vulns > 0) {
     pills.push({
       key: 'vulns',
-      tone: project.countVulnCritical > 0 ? 'high' : 'info',
+      tone: project.countVulnCritical > 0 ? 'critical' : 'info',
       icon: IconBug,
       label:
         project.countVulnCritical > 0

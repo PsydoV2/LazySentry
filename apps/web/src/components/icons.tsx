@@ -201,6 +201,22 @@ export function IconSettings(props: IconProps) {
   );
 }
 
+export function IconFilter(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M3 4h18l-7 8v6l-4 2v-8L3 4Z" />
+    </svg>
+  );
+}
+
+export function IconFilterFilled(props: IconProps) {
+  return (
+    <svg {...base(props)} strokeWidth={0} fill="currentColor" viewBox="0 0 24 24">
+      <path d="M3 4a1 1 0 0 1 1-1h16a1 1 0 0 1 .78 1.63l-6.78 8.24V18a1 1 0 0 1-.45.83l-4 2.67A1 1 0 0 1 8 20.67v-7.8L1.22 4.63A1 1 0 0 1 3 4Z" />
+    </svg>
+  );
+}
+
 export function IconLogOut(props: IconProps) {
   return (
     <svg {...base(props)}>
