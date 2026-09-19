@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 116" width="100" height="116" role="img" aria-label="LazySentry logo mark, owl sentinel variant">
+  <defs>
+    <linearGradient id="g" x1="10" y1="4" x2="90" y2="114" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#a78bfa"/>
+      <stop offset="1" stop-color="#6d28d9"/>
+    </linearGradient>
+    <clipPath id="shieldClip">
+      <path d="M50 8 L18 22 V50 C18 76 32 94 50 106 C68 94 82 76 82 50 V22 L50 8 Z"/>
+    </clipPath>
+  </defs>
+
+  <path d="M50 8 L18 22 V50 C18 76 32 94 50 106 C68 94 82 76 82 50 V22 L50 8 Z" fill="url(#g)"/>
+
+  <g clip-path="url(#shieldClip)">
+    <!-- nocturnal, quiet, sees everything anyway -->
+    <path d="M24 28 L30 12 L34 26 Z" fill="#ffffff" opacity="0.9"/>
+    <path d="M76 28 L70 12 L66 26 Z" fill="#ffffff" opacity="0.9"/>
+
+    <circle cx="34" cy="54" r="13" fill="#ffffff"/>
+    <circle cx="66" cy="54" r="13" fill="#ffffff"/>
+    <circle cx="34" cy="54" r="6" fill="#4c1d95"/>
+    <circle cx="66" cy="54" r="6" fill="#4c1d95"/>
+    <circle cx="36.5" cy="51.5" r="1.5" fill="#ffffff"/>
+    <circle cx="68.5" cy="51.5" r="1.5" fill="#ffffff"/>
+
+    <path d="M47 60 L53 60 L50 70 Z" fill="#4c1d95"/>
+  </g>
+</svg>
