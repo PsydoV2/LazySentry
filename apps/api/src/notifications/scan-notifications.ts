@@ -1,12 +1,30 @@
-// Decides whether a finished scan is worth a Discord notification, and
-// builds the message (roadmap Phase 3, docs/CONCEPT.md 2.3). Fires on newly
-// discovered open findings and on a failed scan — never on an unchanged,
-// successful re-scan, so an idle project does not spam the channel.
+// Decides whether a finished scan is worth a notification, and builds the
+// message (roadmap Phase 3, docs/CONCEPT.md 2.3). Fires on newly discovered
+// open findings and on a failed scan — never on an unchanged, successful
+// re-scan, so an idle project does not spam every configured channel.
 
 import { and, eq, isNull } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { secrets, vulnerabilities } from '../db/schema.js';
-import { sendDiscordNotification } from './discord.js';
+import { getChannelUrl, listNotificationChannels } from './channels.js';
+import { getNotificationPlatform, isNotificationPlatformId } from './index.js';
+import type { NotificationPlatformId } from './types.js';
+
+/** Sends `content` to every configured channel, one platform's failure
+ * never blocking another's (send() itself never throws either). */
+async function broadcast(content: string): Promise<void> {
+  const channels = listNotificationChannels().filter((channel) =>
+    isNotificationPlatformId(channel.platform),
+  );
+  await Promise.all(
+    channels.map((channel) =>
+      getNotificationPlatform(channel.platform as NotificationPlatformId).send(
+        getChannelUrl(channel),
+        content,
+      ),
+    ),
+  );
+}
 
 export async function notifyScanResult(
   project: { id: number; fullName: string },
@@ -17,9 +35,7 @@ export async function notifyScanResult(
   if (status === 'cancelled') return;
 
   if (status === 'failed') {
-    await sendDiscordNotification(
-      `⚠️ Scan failed for **${project.fullName}** — check the dashboard for details.`,
-    );
+    await broadcast(`⚠️ Scan failed for ${project.fullName} — check the dashboard for details.`);
     return;
   }
 
@@ -50,7 +66,7 @@ export async function notifyScanResult(
 
   if (newVulns.length === 0 && newSecrets.length === 0) return;
 
-  const lines = [`🔍 New findings in **${project.fullName}**`];
+  const lines = [`🔍 New findings in ${project.fullName}`];
 
   const verifiedSecrets = newSecrets.filter((s) => s.isVerified).length;
   const unknownSecrets = newSecrets.length - verifiedSecrets;
@@ -70,5 +86,5 @@ export async function notifyScanResult(
     lines.push(`🔵 ${otherVulns} other vulnerabilit${otherVulns === 1 ? 'y' : 'ies'}`);
   }
 
-  await sendDiscordNotification(lines.join('\n'));
+  await broadcast(lines.join('\n'));
 }

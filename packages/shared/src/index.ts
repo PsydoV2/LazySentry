@@ -280,18 +280,79 @@ export interface ProjectReorder {
 
 // ---- instance settings (roadmap Phase 3, docs/CONCEPT.md 2.3) ----
 
-/** GET /api/settings — the webhook URL itself is never returned, same as a
- * connected account's token (docs/CONCEPT.md 4.2). */
+/** GET /api/settings */
 export interface AppSettings {
-  discordWebhookConfigured: boolean;
   /** 0 = disabled — one global interval for every project (§2.3 decision). */
   scanScheduleIntervalHours: number;
+  /** Hour of day (0-23, server-local) the schedule is anchored to — "every 6
+   * hours" fires at anchorHour, anchorHour+6, etc.; "daily"/"weekly" fire
+   * once at anchorHour. Ignored while the schedule is off. */
+  scanScheduleAnchorHour: number;
+  /** 0=Sunday..6=Saturday. Only meaningful when scanScheduleIntervalHours is
+   * the weekly preset (168) — ignored otherwise. */
+  scanScheduleWeekday: number;
 }
 
 export interface AppSettingsUpdate {
-  /** `null` clears a previously configured webhook. */
-  discordWebhookUrl?: string | null;
   scanScheduleIntervalHours?: number;
+  scanScheduleAnchorHour?: number;
+  scanScheduleWeekday?: number;
+}
+
+/** Hours of day (0-23) a scan-schedule interval fires at, anchored to
+ * `anchorHour` — e.g. every-6-hours anchored at 02 fires at 02/08/14/20. A
+ * daily or weekly schedule fires once, at `anchorHour` itself. Shared by the
+ * scheduler (apps/api/src/scan/schedule.ts) and the settings UI's hint text,
+ * so the two can never disagree about when a schedule actually runs. */
+export function scanScheduleHoursOfDay(intervalHours: number, anchorHour: number): number[] {
+  if (intervalHours >= 24) return [anchorHour];
+  const hours: number[] = [];
+  for (let hour = anchorHour % intervalHours; hour < 24; hour += intervalHours) {
+    hours.push(hour);
+  }
+  return hours;
+}
+
+// ---- notification channels (roadmap Phase 3, docs/CONCEPT.md 2.3) ----
+//
+// Several can be configured at once, including several of the same
+// platform (e.g. two Slack channels) — every one receives every scan
+// notification. The interface behind a platform id stays abstract so a
+// future one is a new file, not a rewrite (apps/api/src/notifications).
+
+export type NotificationPlatformId = 'discord' | 'slack' | 'webhook';
+
+/** GET /api/notification-platforms — what the "add channel" form can offer. */
+export interface NotificationPlatformInfo {
+  id: NotificationPlatformId;
+  label: string;
+}
+
+export interface NotificationPlatformsList {
+  platforms: NotificationPlatformInfo[];
+}
+
+/** A configured notification channel — deliberately never carries the
+ * webhook URL itself once saved, same as a git account's token. */
+export interface NotificationChannel {
+  id: number;
+  platform: NotificationPlatformId;
+  /** Admin-chosen name to tell two channels of the same platform apart;
+   * null falls back to the platform's own label in the UI. */
+  label: string | null;
+  createdAt: number;
+}
+
+/** GET /api/notification-channels */
+export interface NotificationChannelsList {
+  channels: NotificationChannel[];
+}
+
+/** POST /api/notification-channels */
+export interface CreateNotificationChannelInput {
+  platform: NotificationPlatformId;
+  url: string;
+  label?: string;
 }
 
 // ---- scans & findings ----

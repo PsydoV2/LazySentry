@@ -13,10 +13,12 @@ const { closeDb, db, runMigrations } = await import('../db/client.js');
 const { settings } = await import('../db/schema.js');
 const {
   getAppSettingsPublic,
-  getDiscordWebhookUrl,
+  getScanScheduleAnchorHour,
   getScanScheduleIntervalHours,
-  setDiscordWebhookUrl,
+  getScanScheduleWeekday,
+  setScanScheduleAnchorHour,
   setScanScheduleIntervalHours,
+  setScanScheduleWeekday,
 } = await import('./app-settings.js');
 
 beforeAll(() => {
@@ -33,29 +35,6 @@ afterAll(() => {
 });
 
 describe('app settings', () => {
-  it('reports the webhook as unconfigured until one is set', () => {
-    expect(getAppSettingsPublic().discordWebhookConfigured).toBe(false);
-    expect(getDiscordWebhookUrl()).toBeNull();
-  });
-
-  it('round-trips a discord webhook url without exposing it publicly', () => {
-    setDiscordWebhookUrl('https://discord.com/api/webhooks/1/secret-token');
-
-    expect(getDiscordWebhookUrl()).toBe('https://discord.com/api/webhooks/1/secret-token');
-    // The public view never carries the raw url, same as a git account token.
-    const publicView = getAppSettingsPublic() as Record<string, unknown>;
-    expect(publicView['discordWebhookConfigured']).toBe(true);
-    expect(publicView['discordWebhookUrl']).toBeUndefined();
-  });
-
-  it('clears the webhook when set to null', () => {
-    setDiscordWebhookUrl('https://discord.com/api/webhooks/1/secret-token');
-    setDiscordWebhookUrl(null);
-
-    expect(getDiscordWebhookUrl()).toBeNull();
-    expect(getAppSettingsPublic().discordWebhookConfigured).toBe(false);
-  });
-
   it('treats a missing schedule interval as disabled (0)', () => {
     expect(getScanScheduleIntervalHours()).toBe(0);
     expect(getAppSettingsPublic().scanScheduleIntervalHours).toBe(0);
@@ -67,5 +46,22 @@ describe('app settings', () => {
 
     setScanScheduleIntervalHours(0);
     expect(getScanScheduleIntervalHours()).toBe(0);
+  });
+
+  it('defaults the anchor hour to midnight and the weekday to Monday', () => {
+    expect(getScanScheduleAnchorHour()).toBe(0);
+    expect(getScanScheduleWeekday()).toBe(1);
+    expect(getAppSettingsPublic().scanScheduleAnchorHour).toBe(0);
+    expect(getAppSettingsPublic().scanScheduleWeekday).toBe(1);
+  });
+
+  it('round-trips the anchor hour and weekday', () => {
+    setScanScheduleAnchorHour(4);
+    setScanScheduleWeekday(3);
+
+    expect(getScanScheduleAnchorHour()).toBe(4);
+    expect(getScanScheduleWeekday()).toBe(3);
+    expect(getAppSettingsPublic().scanScheduleAnchorHour).toBe(4);
+    expect(getAppSettingsPublic().scanScheduleWeekday).toBe(3);
   });
 });

@@ -317,3 +317,19 @@ export const secrets = sqliteTable(
     index('secrets_project_status_idx').on(table.projectId, table.status),
   ],
 );
+
+/**
+ * Configured notification channels (roadmap Phase 3, docs/CONCEPT.md 2.3).
+ * Several can be connected at once, including several of the same platform
+ * (e.g. two Slack channels) — every one receives every scan notification,
+ * same "no per-project config" philosophy as the scan schedule.
+ */
+export const notificationChannels = sqliteTable('notification_channels', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  platform: text('platform').notNull(), // 'discord' | 'slack' | 'webhook'
+  // Admin-chosen name to tell two channels of the same platform apart; null
+  // falls back to the platform's own label in the UI.
+  label: text('label'),
+  urlEncrypted: text('url_encrypted').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+});

@@ -3,6 +3,7 @@
 
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { scanScheduleHoursOfDay } from '@lazysentry/shared';
 import {
   ConnectGitAccount,
   ReconnectAccount,
@@ -11,13 +12,16 @@ import {
 import {
   IconBell,
   IconClock,
+  IconDiscord,
   IconGithub,
   IconGitlab,
   IconKey,
   IconPlus,
+  IconSlack,
   IconTrash,
   IconUser,
   IconUsers,
+  IconWebhook,
 } from '../components/icons';
 import { Modal } from '../components/Modal';
 import { Popup } from '../components/Popup';
@@ -26,12 +30,17 @@ import {
   api,
   ApiError,
   type AppSettings,
+  type AppSettingsUpdate,
   type AppUser,
   type ConnectResult,
   type CurrentUser,
   type GitAccount,
   type GitAccountsList,
   type GitProviderId,
+  type NotificationChannel,
+  type NotificationChannelsList,
+  type NotificationPlatformId,
+  type NotificationPlatformsList,
   type ProvidersList,
   type UserRole,
   type UsersList,
@@ -46,6 +55,27 @@ const SCHEDULE_PRESETS: { hours: number; label: string }[] = [
   { hours: 24 * 7, label: 'Weekly' },
 ];
 
+function formatHour(hour: number): string {
+  return `${String(hour).padStart(2, '0')}:00`;
+}
+
+const HOUR_OPTIONS: SelectOption<number>[] = Array.from({ length: 24 }, (_, hour) => ({
+  value: hour,
+  label: formatHour(hour),
+}));
+
+// Value is JS Date#getDay() (0=Sunday..6=Saturday); listed Monday-first to
+// match how a week reads, not how getDay() numbers it.
+const WEEKDAY_OPTIONS: SelectOption<number>[] = [
+  { value: 1, label: 'Monday' },
+  { value: 2, label: 'Tuesday' },
+  { value: 3, label: 'Wednesday' },
+  { value: 4, label: 'Thursday' },
+  { value: 5, label: 'Friday' },
+  { value: 6, label: 'Saturday' },
+  { value: 0, label: 'Sunday' },
+];
+
 const ROLE_OPTIONS: SelectOption<UserRole>[] = [
   { value: 'member', label: 'Member' },
   { value: 'admin', label: 'Admin' },
@@ -54,6 +84,18 @@ const ROLE_OPTIONS: SelectOption<UserRole>[] = [
 function ProviderIcon({ provider }: { provider: string }) {
   return provider === 'gitlab' ? <IconGitlab /> : <IconGithub />;
 }
+
+function NotificationPlatformIcon({ platform }: { platform: string }) {
+  if (platform === 'discord') return <IconDiscord />;
+  if (platform === 'slack') return <IconSlack />;
+  return <IconWebhook />;
+}
+
+const CHANNEL_URL_PLACEHOLDER: Record<NotificationPlatformId, string> = {
+  discord: 'https://discord.com/api/webhooks/…',
+  slack: 'https://hooks.slack.com/services/…',
+  webhook: 'https://example.com/webhook',
+};
 
 export function Settings({
   onClose,
@@ -215,31 +257,42 @@ function AddAccountPopup({
   );
 }
 
-/** Discord webhook configuration (roadmap Phase 3, docs/CONCEPT.md 2.3). */
+/**
+ * Notification channels (roadmap Phase 3, docs/CONCEPT.md 2.3) — several at
+ * once, including several of the same platform (e.g. two Slack channels);
+ * every one receives every scan notification. Managing these is a
+ * member-level action, not admin-only (docs/CONCEPT.md 2.6), unlike git
+ * accounts and users below.
+ */
 function NotificationsCard() {
   const queryClient = useQueryClient();
-  const [editing, setEditing] = useState(false);
-  const [webhookUrl, setWebhookUrl] = useState('');
+  const [addingPlatform, setAddingPlatform] = useState<NotificationPlatformId | null>(null);
 
-  const appSettings = useQuery({
-    queryKey: ['app-settings'],
-    queryFn: () => api.get<AppSettings>('/api/settings'),
+  const channels = useQuery({
+    queryKey: ['notification-channels'],
+    queryFn: () => api.get<NotificationChannelsList>('/api/notification-channels'),
   });
 
-  const save = useMutation({
-    mutationFn: (discordWebhookUrl: string | null) =>
-      api.patch<AppSettings>('/api/settings', { discordWebhookUrl }),
-    onSuccess: () => {
-      setEditing(false);
-      setWebhookUrl('');
-      queryClient.invalidateQueries({ queryKey: ['app-settings'] });
-    },
+  const platforms = useQuery({
+    queryKey: ['notification-platforms'],
+    queryFn: () => api.get<NotificationPlatformsList>('/api/notification-platforms'),
   });
 
-  function handleSubmit(event: FormEvent) {
-    event.preventDefault();
-    save.mutate(webhookUrl.trim());
+  function invalidateChannels(): void {
+    queryClient.invalidateQueries({ queryKey: ['notification-channels'] });
   }
+
+  function toggleAddPlatform(id: NotificationPlatformId): void {
+    setAddingPlatform((current) => (current === id ? null : id));
+  }
+
+  const remove = useMutation({
+    mutationFn: (id: number) => api.delete<void>(`/api/notification-channels/${id}`),
+    onSuccess: invalidateChannels,
+  });
+
+  const platformLabel = (id: string) =>
+    platforms.data?.platforms.find((p) => p.id === id)?.label ?? id;
 
   return (
     <div className="card stack">
@@ -248,90 +301,174 @@ function NotificationsCard() {
         <h2>Notifications</h2>
       </div>
       <p className="subtle">
-        Get a Discord message when a scan finds new vulnerabilities or
-        secrets, or fails outright.
+        Get a message when a scan finds new vulnerabilities or secrets, or
+        fails outright.
       </p>
 
-      {appSettings.isLoading && <p className="muted">Loading…</p>}
+      <div className="row" style={{ gap: 8 }}>
+        {platforms.data?.platforms.map((platform) => (
+          <button
+            key={platform.id}
+            type="button"
+            className={`provider-add-btn ${addingPlatform === platform.id ? 'is-active' : ''}`}
+            onClick={() => toggleAddPlatform(platform.id)}
+          >
+            <NotificationPlatformIcon platform={platform.id} />
+            {platform.label}
+            <IconPlus />
+          </button>
+        ))}
+      </div>
 
-      {appSettings.data && !editing && (
-        <div className="settings-row">
-          <span className="row">
-            <span
-              className={`pill ${appSettings.data.discordWebhookConfigured ? 'pill-ok' : 'pill-neutral'}`}
-            >
-              {appSettings.data.discordWebhookConfigured ? 'Configured' : 'Not configured'}
-            </span>
-          </span>
-          <span className="row">
-            <button type="button" className="btn-quiet" onClick={() => setEditing(true)}>
-              {appSettings.data.discordWebhookConfigured ? 'Replace' : 'Set up'}
-            </button>
-            {appSettings.data.discordWebhookConfigured && (
-              <button
-                type="button"
-                className="icon-btn icon-btn-danger"
-                title="Remove webhook"
-                aria-label="Remove webhook"
-                disabled={save.isPending}
-                onClick={() => save.mutate(null)}
-              >
-                <IconTrash />
-              </button>
-            )}
-          </span>
-        </div>
+      {channels.isLoading && <p className="muted">Loading…</p>}
+      {channels.isError && (
+        <p className="notice notice-error">
+          {channels.error instanceof ApiError
+            ? channels.error.message
+            : 'Could not load notification channels.'}
+        </p>
+      )}
+      {channels.data && channels.data.channels.length === 0 && !addingPlatform && (
+        <p className="subtle">No channels configured yet.</p>
       )}
 
-      {editing && (
-        <form className="stack" onSubmit={handleSubmit}>
-          <div>
-            <label htmlFor="discord-webhook">Discord webhook URL</label>
-            <input
-              id="discord-webhook"
-              type="password"
-              value={webhookUrl}
-              autoComplete="off"
-              placeholder="https://discord.com/api/webhooks/…"
-              onChange={(event) => setWebhookUrl(event.target.value)}
-            />
-            <p className="field-hint">
-              Create one in a Discord channel's Integrations settings. The
-              URL is encrypted before it is stored and never shown again.
-            </p>
-          </div>
-          {save.isError && (
-            <p className="notice notice-error">
-              {save.error instanceof ApiError ? save.error.message : 'Could not save.'}
-            </p>
-          )}
-          <div className="row">
-            <button
-              type="submit"
-              className="btn-primary"
-              disabled={save.isPending || webhookUrl.trim() === ''}
-            >
-              {save.isPending ? 'Saving…' : 'Save'}
-            </button>
-            <button
-              type="button"
-              className="btn-quiet"
-              onClick={() => {
-                setEditing(false);
-                setWebhookUrl('');
-              }}
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
+      {channels.data?.channels.map((channel) => (
+        <div
+          key={channel.id}
+          className="settings-row"
+          style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--space-3)' }}
+        >
+          <span className="row">
+            <NotificationPlatformIcon platform={channel.platform} />
+            <span className="stack" style={{ gap: 2 }}>
+              <strong>{channel.label ?? platformLabel(channel.platform)}</strong>
+              <span className="subtle">added {relativeTime(channel.createdAt)}</span>
+            </span>
+          </span>
+          <button
+            type="button"
+            className="icon-btn icon-btn-danger"
+            title="Remove channel"
+            aria-label={`Remove ${channel.label ?? platformLabel(channel.platform)}`}
+            disabled={remove.isPending}
+            onClick={() => remove.mutate(channel.id)}
+          >
+            <IconTrash />
+          </button>
+        </div>
+      ))}
+
+      {addingPlatform && (
+        <AddChannelPopup
+          platform={addingPlatform}
+          label={platformLabel(addingPlatform)}
+          onClose={() => setAddingPlatform(null)}
+          onCreated={invalidateChannels}
+        />
       )}
     </div>
   );
 }
 
-/** Global scan-schedule interval (roadmap Phase 3, docs/CONCEPT.md 2.3) — one
- * interval for every project, matching the "five-minute setup" philosophy. */
+/** Popup for adding a notification channel. */
+function AddChannelPopup({
+  platform,
+  label,
+  onClose,
+  onCreated,
+}: {
+  platform: NotificationPlatformId;
+  label: string;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const [url, setUrl] = useState('');
+  const [channelLabel, setChannelLabel] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    setError(null);
+    setBusy(true);
+    try {
+      await api.post<{ channel: NotificationChannel }>('/api/notification-channels', {
+        platform,
+        url: url.trim(),
+        ...(channelLabel.trim() ? { label: channelLabel.trim() } : {}),
+      });
+      onCreated();
+      onClose();
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : 'Could not add channel');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Popup title={`Add ${label} channel`} onClose={onClose}>
+      <form className="stack" onSubmit={handleSubmit}>
+        <div>
+          <label htmlFor="channel-url">Webhook URL</label>
+          <input
+            id="channel-url"
+            type="password"
+            value={url}
+            autoComplete="off"
+            placeholder={CHANNEL_URL_PLACEHOLDER[platform]}
+            onChange={(event) => setUrl(event.target.value)}
+          />
+          <p className="field-hint">
+            The URL is encrypted before it is stored and never shown again.
+          </p>
+        </div>
+        <div>
+          <label htmlFor="channel-label">Name (optional)</label>
+          <input
+            id="channel-label"
+            type="text"
+            value={channelLabel}
+            autoComplete="off"
+            placeholder={label}
+            onChange={(event) => setChannelLabel(event.target.value)}
+          />
+          <p className="field-hint">Helps tell two {label} channels apart.</p>
+        </div>
+        {error && <p className="notice notice-error">{error}</p>}
+        <div className="row">
+          <button type="submit" className="btn-primary" disabled={busy || url.trim() === ''}>
+            {busy ? 'Adding…' : 'Add channel'}
+          </button>
+          <button type="button" className="btn-quiet" onClick={onClose}>
+            Cancel
+          </button>
+        </div>
+      </form>
+    </Popup>
+  );
+}
+
+/** Describes when a schedule actually fires, in the same terms the user
+ * picked it in — reads the fire hours from the same helper the backend
+ * scheduler uses, so this text can never drift from what actually runs. */
+function describeSchedule(intervalHours: number, anchorHour: number, weekday: number): string {
+  if (intervalHours >= 24 * 7) {
+    const day = WEEKDAY_OPTIONS.find((option) => option.value === weekday)?.label ?? '';
+    return `Runs every ${day} at ${formatHour(anchorHour)}.`;
+  }
+  if (intervalHours >= 24) {
+    return `Runs daily at ${formatHour(anchorHour)}.`;
+  }
+  const hours = scanScheduleHoursOfDay(intervalHours, anchorHour).map(formatHour).join(', ');
+  return `Runs at ${hours}.`;
+}
+
+/** Global scan-schedule (roadmap Phase 3, docs/CONCEPT.md 2.3) — one
+ * schedule for every project, matching the "five-minute setup" philosophy.
+ * Anchored to a fixed server-local hour (and weekday, for the weekly
+ * preset) rather than "N hours since each project's last scan", so "daily"
+ * or "every 6 hours" has a concrete, admin-chosen answer to "starting when". */
 function ScanScheduleCard() {
   const queryClient = useQueryClient();
 
@@ -341,10 +478,11 @@ function ScanScheduleCard() {
   });
 
   const save = useMutation({
-    mutationFn: (scanScheduleIntervalHours: number) =>
-      api.patch<AppSettings>('/api/settings', { scanScheduleIntervalHours }),
+    mutationFn: (patch: AppSettingsUpdate) => api.patch<AppSettings>('/api/settings', patch),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['app-settings'] }),
   });
+
+  const data = appSettings.data;
 
   return (
     <div className="card stack">
@@ -353,21 +491,50 @@ function ScanScheduleCard() {
         <h2>Scan schedule</h2>
       </div>
       <p className="subtle">
-        Automatically re-scan every project on this interval, in addition to
+        Automatically re-scan every project on this schedule, in addition to
         manually triggered scans.
       </p>
 
       {appSettings.isLoading && <p className="muted">Loading…</p>}
 
-      {appSettings.data && (
-        <div>
-          <Select
-            value={appSettings.data.scanScheduleIntervalHours}
-            disabled={save.isPending}
-            ariaLabel="Scan schedule"
-            options={SCHEDULE_PRESETS.map((preset) => ({ value: preset.hours, label: preset.label }))}
-            onChange={(hours) => save.mutate(hours)}
-          />
+      {data && (
+        <div className="stack" style={{ gap: 'var(--space-2)' }}>
+          <div className="row" style={{ gap: 8 }}>
+            <Select
+              value={data.scanScheduleIntervalHours}
+              disabled={save.isPending}
+              ariaLabel="Scan schedule"
+              options={SCHEDULE_PRESETS.map((preset) => ({ value: preset.hours, label: preset.label }))}
+              onChange={(scanScheduleIntervalHours) => save.mutate({ scanScheduleIntervalHours })}
+            />
+            {data.scanScheduleIntervalHours > 0 && (
+              <Select
+                value={data.scanScheduleAnchorHour}
+                disabled={save.isPending}
+                ariaLabel="Anchor hour"
+                options={HOUR_OPTIONS}
+                onChange={(scanScheduleAnchorHour) => save.mutate({ scanScheduleAnchorHour })}
+              />
+            )}
+            {data.scanScheduleIntervalHours >= 24 * 7 && (
+              <Select
+                value={data.scanScheduleWeekday}
+                disabled={save.isPending}
+                ariaLabel="Weekday"
+                options={WEEKDAY_OPTIONS}
+                onChange={(scanScheduleWeekday) => save.mutate({ scanScheduleWeekday })}
+              />
+            )}
+          </div>
+          {data.scanScheduleIntervalHours > 0 && (
+            <p className="field-hint">
+              {describeSchedule(
+                data.scanScheduleIntervalHours,
+                data.scanScheduleAnchorHour,
+                data.scanScheduleWeekday,
+              )}
+            </p>
+          )}
         </div>
       )}
 
