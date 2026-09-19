@@ -92,6 +92,9 @@ Das MVP (2.1) ist abgeschlossen. Bis 2026-09-18 wurde jede Erweiterung darüber 
 - **Cron-Scheduling.** Ein global geteiltes Zeitfenster für alle Projekte, verankert an einer Uhrzeit (und für „wöchentlich" zusätzlich einem Wochentag) statt nur „alle N Stunden seit dem letzten Scan pro Projekt" (`apps/api/src/scan/schedule.ts`).
 - **Suppression-Workflow.** Eigenes `suppressed_at`-Feld pro Finding, unabhängig vom Reconciliation-Status (4.1) — ein stummgeschaltetes Finding bleibt stummgeschaltet, auch über künftige Scans hinweg, bis es explizit wieder aktiviert wird.
 - **License-Anzeige pro Paket.** Deklarierte Lizenz aus der jeweiligen Registry (npm `license`-Feld, Packagist `composer.json`-Metadaten, PyPI Klassifiers/Metadata, crates.io `license`-Feld), wie die Versions-Daten (5.3) 24h gecacht, als zusätzliche Spalte in der Dependencies-Tabelle (8.2). Feld `packages.license`: Rohwert bzw. `unknown`, wenn die Registry nichts liefert oder der Ausdruck nicht geparst werden kann — nicht raten. Rein informativ, **kein** Allow-/Denylist-Policy-Engine, keine automatische Copyleft/Permissive-Klassifizierung.
+- **Sustainability-/Dead-Project-Score.** Rein aktivitätsbasiert, keine Bewertung von Codequalität oder "Wichtigkeit". Signal ist das tatsächliche letzte Commit-Datum des geklonten `HEAD` (`git log -1 --format=%cI`, direkt nach dem Clone gelesen — kostet keinen zusätzlichen Provider-API-Call und ist genauer als das Provider-`updated_at`, das auch bei Issues/Stars springt), gespeichert als `projects.last_commit_at`. Daraus wird serverseitig (`packages/shared`, `sustainabilityStatusFor`) ein Status abgeleitet: `active` (≤180 Tage), `aging` (≤365), `stale` (≤730), `dead` (>730), `unknown` (noch kein erfolgreicher Clone). Rein informativ und **nicht** Teil der Card-Farbe/Dringlichkeits-Sortierung (8.1 bleibt ausschließlich Severity-getrieben) — im Grid nur als neutrales Pill-Badge ab `stale`, in der Detailansicht (Overview) immer als Fakt "Last commit vor X" neben "Last scan". Details: 4 (Datenmodell), 5.1.
+- **Audit-Log.** Tabelle `audit_log` protokolliert sicherheitsrelevante, zustandsändernde Aktionen (Login/Login-Fehlschlag, Nutzer anlegen/Rolle ändern/löschen, Git-Account verbinden/reconnecten/löschen, Projekt importieren/löschen, Scan auslösen/abbrechen, Settings- und Notification-Channel-Änderungen) mit Akteur (`user_id` + Username-Snapshot, da der User später gelöscht sein kann), IP, Ressource und einem kleinen `meta`-JSON. Bewusst **nicht** protokolliert: Findings suppressen/unsuppressen (zu hochfrequent, kein Sicherheitswert) und reine GET-Requests. Kein automatisches Pruning in v1 — bei den in 1. beschriebenen Repo-Zahlen (5–50) bleibt die Tabelle klein; falls das je zum Problem wird, ist das ein neues, eigenes Ticket. Admin-only einsehbar unter `GET /api/audit-log`, paginiert. Details: 4, 6.2.
+- **Checksum-Verifikation der Scanner-Binaries.** Der Worker hasht `osv-scanner` und `trufflehog` beim Start (SHA-256, PATH-Auflösung in reinem JS, kein Subprozess) und vergleicht gegen in `apps/api/src/scanner/versions.ts` gepinnte Werte (`SCANNER_CHECKSUMS`, neben `SCANNER_VERSIONS`). Eine Abweichung vom gepinnten Wert lässt den Worker mit einer klaren Fehlermeldung beenden (fail-closed — dieselbe Härte wie der fehlende `APP_ENCRYPTION_KEY` in `config.ts`), da eine Abweichung ein Kompromittierungs-Indikator ist, kein normaler Betriebszustand (Bedrohungsmodell 6.1). Ist für eine Version (noch) kein Checksum gepinnt, läuft der Worker weiter, aber mit einer sichtbaren `WARNING`-Zeile im Log — **kein falsches Grün** (11.), das stille Fehlen einer Prüfung sieht anders aus als eine bestandene. `apps/api/src/scripts/print-scanner-checksums.ts` berechnet die aktuellen Hashes (z. B. per `docker run --rm --entrypoint node <image> api/dist/scripts/print-scanner-checksums.js`) im fertig gebauten Image, fertig zum Einfügen in `versions.ts` — dieser Schritt gehört in den Release-Prozess, sobald `SCANNER_VERSIONS`/das Dockerfile-Pinning sich ändert. Details: 6.2.
 
 **Weiterhin offen** (kein Punkt hier braucht eine Einzelfreigabe mehr, aber auch keiner gilt als angefangen, bis tatsächlich daran gearbeitet wird):
 
@@ -100,9 +103,7 @@ Das MVP (2.1) ist abgeschlossen. Bis 2026-09-18 wurde jede Erweiterung darüber 
 - Echte Teams/Projekt-Gruppen, feingranulare Permissions über `admin`/`member` hinaus, Invite-per-E-Mail
 - Incoming Webhooks / Event-getriebene Scan-Trigger, Tunneling
 - EPSS- und CISA-KEV-Anreicherung zur Priorisierung
-- Sustainability-/Dead-Project-Score
 - KI-Layer: Triage-Assistent, Reachability-Einschätzung, Upgrade-Assistent — Leitplanken gelten bereits verbindlich, siehe Abschnitt 9
-- Audit-Log, Checksum-Verifikation der Scanner-Binaries — bewusst zurückgestellt, siehe 6.3
 
 ---
 
@@ -197,7 +198,10 @@ projects
   count_vuln_critical, count_vuln_high, count_vuln_medium, count_vuln_low,
   count_secrets_verified, count_secrets_unknown,
   count_outdated_major, count_outdated_minor, count_outdated_patch,
-  last_scanned_commit_sha
+  last_scanned_commit_sha,
+  last_commit_at  -- committer date of the cloned HEAD, read straight out of
+                  -- the clone (git log -1 --format=%cI), not a provider API
+                  -- call; feeds sustainabilityStatusFor() (2.2)
 
 scans
   id, project_id, status, started_at, finished_at,
@@ -223,6 +227,16 @@ secrets
   status ('open'|'resolved'), commit_author, commit_date,
   first_seen_scan_id, last_seen_scan_id, resolved_scan_id, resolved_at
   -- UNIQUE(project_id, fingerprint)
+```
+
+```
+audit_log
+  id, user_id (nullable, ON DELETE SET NULL), username (Snapshot zur Aktionszeit,
+  überlebt eine spätere User-Löschung), ip (nullable),
+  action (z.B. 'auth.login', 'user.role_change', 'project.delete', 'scan.trigger' — siehe 2.2),
+  resource_type (nullable), resource_id (nullable),
+  meta (json, nullable — kleiner Kontext wie {fullName} oder {from, to}, nie Secrets/Tokens),
+  created_at
 ```
 
 ### 4.1 Fingerprints und Reconciliation
@@ -263,6 +277,9 @@ Bei Secrets kürzer als 12 Zeichen wird vollständig maskiert. Der Klartext darf
 1. Scan-Job aus Queue holen, status = 'running'
 2. Clone:      git clone https://<token>@github.com/<full_name> /tmp/scan-<uuid>
                → volle Historie, KEIN --depth 1 (TruffleHog braucht sie)
+               → direkt danach: git log -1 --format=%cI HEAD liest das Committer-
+                 Datum von HEAD für projects.last_commit_at (2.2, Sustainability-
+                 Score) — kein zusätzlicher Netzwerk-Call, die Historie liegt schon da
 3. Secrets:    trufflehog git file:///tmp/scan-<uuid> \
                  --json --results=verified,unknown
 4. Deps+CVEs:  osv-scanner scan source -r /tmp/scan-<uuid> \
@@ -362,9 +379,9 @@ Die eigentliche Trust-Boundary liegt deshalb nicht zwischen Nutzern, sondern zwi
 - **Rate-Limiting nicht nur am Login.** Import- und manueller Scan-Trigger-Endpoint bekommen ebenfalls ein Limit (`@fastify/rate-limit`), damit ein Bug im eigenen Frontend oder eine kompromittierte Session den Worker nicht mit Jobs fluten kann.
 - **`.env` niemals committen.** `.env.example` mit Platzhaltern im Repo, `.env` in `.gitignore`. Kein Agent darf einen echten `APP_ENCRYPTION_KEY`-Wert als Beispiel eintragen.
 
-### 6.3 Bewusst zurückgestellt
+### 6.3 Audit-Log und Checksum-Verifikation
 
-Ein Audit-Log („wer hat wann was gemacht") wäre bei Mehrbenutzerbetrieb (2.2) sinnvoll, bringt aber weiterhin wenig im Verhältnis zum Aufwand — bleibt Backlog (2.2), keiner festen Phase mehr zugeordnet. Checksum-Verifikation der heruntergeladenen Scanner-Binaries ist thematisch passend, aber weiterhin kein Sicherheitsgewinn, der die zusätzliche Komplexität rechtfertigt.
+Beides ist umgesetzt (2.2). Das Audit-Log deckt die in 2.2 gelistete Menge zustandsändernder Aktionen ab — bewusst kein Log jedes GET-Requests oder jeder Suppression, das wäre Rauschen ohne Sicherheitswert. Die Checksum-Verifikation schließt eine reale Lücke aus dem Bedrohungsmodell (6.1): ein manipuliertes `osv-scanner`- oder `trufflehog`-Binary im Image hätte denselben Blast Radius wie ein kompromittiertes Repo, nur eine Ebene tiefer. Sie ist bewusst kein Ersatz für Image-Signaturen/Provenance (z. B. Sigstore/cosign) — das wäre ein Schritt weiter (Verifikation der Lieferkette bis zum Hersteller) und bleibt Backlog, falls der manuelle Pin-Prozess (2.2) sich als zu wartungsintensiv erweist.
 
 ---
 
