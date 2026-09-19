@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { UserMenu } from './components/UserMenu';
 import { api, ApiError, type CurrentUser, type SetupStatus } from './lib/api';
 import { useRoute } from './lib/router';
+import { AuditLog } from './views/AuditLog';
 import { Dashboard } from './views/Dashboard';
 import { Login } from './views/Login';
 import { ProjectDetail } from './views/ProjectDetail';
@@ -100,6 +101,9 @@ export function App() {
           currentUser={session.data}
           onClose={() => navigate({ name: 'dashboard' })}
         />
+      )}
+      {route.name === 'audit-log' && session.data.role === 'admin' && (
+        <AuditLog onClose={() => navigate({ name: 'dashboard' })} />
       )}
     </>
   );

@@ -7,7 +7,15 @@ import { useMutation } from '@tanstack/react-query';
 import { api, type CurrentUser } from '../lib/api';
 import type { Route } from '../lib/router';
 import { type Theme, useTheme } from '../lib/theme';
-import { IconLogOut, IconMonitor, IconMoon, IconSettings, IconSun, IconUser } from './icons';
+import {
+  IconHistory,
+  IconLogOut,
+  IconMonitor,
+  IconMoon,
+  IconSettings,
+  IconSun,
+  IconUser,
+} from './icons';
 
 const THEME_OPTIONS: { value: Theme; label: string; icon: typeof IconSun }[] = [
   { value: 'system', label: 'Match system theme', icon: IconMonitor },
@@ -103,6 +111,19 @@ export function UserMenu({
           >
             <IconSettings /> Settings
           </button>
+          {user.role === 'admin' && (
+            <button
+              type="button"
+              role="menuitem"
+              className="user-menu-item"
+              onClick={() => {
+                setOpen(false);
+                navigate({ name: 'audit-log' });
+              }}
+            >
+              <IconHistory /> Audit log
+            </button>
+          )}
           <button
             type="button"
             role="menuitem"
