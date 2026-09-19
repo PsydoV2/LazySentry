@@ -5,6 +5,7 @@
 
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { recordAuditLog } from '../audit/log.js';
 import { requireAuth, requireSameOrigin } from '../auth/session.js';
 import { badRequest, notFound } from '../lib/errors.js';
 import {
@@ -60,6 +61,12 @@ export function registerNotificationChannelRoutes(app: FastifyInstance): void {
       label: input.label?.trim() || null,
       url: input.url,
     });
+    recordAuditLog(request, {
+      action: 'notification_channel.create',
+      resourceType: 'notification_channel',
+      resourceId: created.id,
+      meta: { platform: input.platform, label: created.label },
+    });
     return reply.status(201).send({ channel: toPublicChannel(created) });
   });
 
@@ -67,9 +74,16 @@ export function registerNotificationChannelRoutes(app: FastifyInstance): void {
     requireAuth(request);
     requireSameOrigin(request);
     const { id } = z.object({ id: z.coerce.number().int() }).parse(request.params);
-    if (!getNotificationChannelById(id)) throw notFound('Notification channel not found');
+    const channel = getNotificationChannelById(id);
+    if (!channel) throw notFound('Notification channel not found');
 
     deleteNotificationChannel(id);
+    recordAuditLog(request, {
+      action: 'notification_channel.delete',
+      resourceType: 'notification_channel',
+      resourceId: id,
+      meta: { platform: channel.platform, label: channel.label },
+    });
     return reply.status(204).send();
   });
 }

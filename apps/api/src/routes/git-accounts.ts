@@ -4,6 +4,7 @@
 import type { FastifyInstance } from 'fastify';
 import { inArray } from 'drizzle-orm';
 import { z } from 'zod';
+import { recordAuditLog } from '../audit/log.js';
 import {
   countProjectsForAccount,
   createGitAccount,
@@ -126,6 +127,12 @@ export function registerGitAccountRoutes(app: FastifyInstance): void {
         scopes: account.scopes,
       });
 
+      recordAuditLog(request, {
+        action: 'git_account.connect',
+        resourceType: 'git_account',
+        resourceId: saved.id,
+        meta: { provider: input.provider, username: account.username },
+      });
       return reply.status(201).send({
         account: toPublicAccount(saved),
         // Surfaced by the UI as a visible warning (docs/CONCEPT.md 6.2).
@@ -165,6 +172,12 @@ export function registerGitAccountRoutes(app: FastifyInstance): void {
         scopes: validated.scopes,
       });
 
+      recordAuditLog(request, {
+        action: 'git_account.reconnect',
+        resourceType: 'git_account',
+        resourceId: id,
+        meta: { provider: account.provider, username: validated.username },
+      });
       return reply.status(200).send({
         account: toPublicAccount(saved),
         writeScopes: validated.writeScopes,
@@ -177,7 +190,7 @@ export function registerGitAccountRoutes(app: FastifyInstance): void {
     requireRole(request, 'admin');
     requireSameOrigin(request);
     const { id } = z.object({ id: z.coerce.number().int() }).parse(request.params);
-    requireAccount(id);
+    const account = requireAccount(id);
 
     const projectCount = countProjectsForAccount(id);
     if (projectCount > 0) {
@@ -188,6 +201,12 @@ export function registerGitAccountRoutes(app: FastifyInstance): void {
     }
 
     deleteGitAccount(id);
+    recordAuditLog(request, {
+      action: 'git_account.delete',
+      resourceType: 'git_account',
+      resourceId: id,
+      meta: { provider: account.provider, username: account.username },
+    });
     return reply.status(204).send();
   });
 
@@ -340,6 +359,12 @@ export function registerGitAccountRoutes(app: FastifyInstance): void {
           .get();
         // The card should appear as "scanning" right away (docs/CONCEPT.md 8.1).
         enqueueScanJob({ projectId: project.id, trigger: 'manual' });
+        recordAuditLog(request, {
+          action: 'project.import',
+          resourceType: 'project',
+          resourceId: project.id,
+          meta: { fullName: project.fullName },
+        });
         imported.push(project);
       }
 

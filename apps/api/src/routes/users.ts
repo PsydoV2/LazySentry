@@ -4,6 +4,7 @@
 
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { recordAuditLog } from '../audit/log.js';
 import { requireAuth, requireRole, requireSameOrigin } from '../auth/session.js';
 import {
   countAdmins,
@@ -62,6 +63,12 @@ export function registerUserRoutes(app: FastifyInstance): void {
       }
 
       const user = await createUser(input.username, input.password, input.role);
+      recordAuditLog(request, {
+        action: 'user.create',
+        resourceType: 'user',
+        resourceId: user.id,
+        meta: { username: user.username, role: user.role },
+      });
       return reply.status(201).send(toWireUser(user));
     },
   );
@@ -88,6 +95,12 @@ export function registerUserRoutes(app: FastifyInstance): void {
 
     const updated = updateUserRole(id, role);
     if (!updated) throw notFound('User not found');
+    recordAuditLog(request, {
+      action: 'user.role_change',
+      resourceType: 'user',
+      resourceId: id,
+      meta: { username: target.username, from: target.role, to: role },
+    });
     return reply.send(toWireUser(updated));
   });
 
@@ -108,6 +121,12 @@ export function registerUserRoutes(app: FastifyInstance): void {
     }
 
     deleteUser(id);
+    recordAuditLog(request, {
+      action: 'user.delete',
+      resourceType: 'user',
+      resourceId: id,
+      meta: { username: target.username },
+    });
     return reply.status(204).send();
   });
 }

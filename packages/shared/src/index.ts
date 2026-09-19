@@ -64,6 +64,38 @@ export type FindingStatus = 'open' | 'resolved';
 
 export type ScanTrigger = 'manual' | 'scheduled';
 
+/**
+ * Activity-based sustainability signal (docs/CONCEPT.md 2.2): purely how
+ * recently the default branch was committed to, never a judgement of code
+ * quality or importance. `unknown` means no successful clone has captured a
+ * commit date yet — distinct from `dead`, never guessed (11. "kein falsches
+ * Grün" applies here too).
+ */
+export type SustainabilityStatus = 'active' | 'aging' | 'stale' | 'dead' | 'unknown';
+
+const SUSTAINABILITY_THRESHOLDS_DAYS = {
+  active: 180,
+  aging: 365,
+  stale: 730,
+} as const;
+
+/**
+ * Derives the sustainability status from the committer date of the cloned
+ * HEAD (`projects.lastCommitAt`) — shared by the API's project DTO and any
+ * other consumer so the thresholds live in exactly one place.
+ */
+export function sustainabilityStatusFor(
+  lastCommitAt: number | null,
+  now: number = Date.now(),
+): SustainabilityStatus {
+  if (lastCommitAt === null) return 'unknown';
+  const days = (now - lastCommitAt) / (24 * 60 * 60 * 1000);
+  if (days <= SUSTAINABILITY_THRESHOLDS_DAYS.active) return 'active';
+  if (days <= SUSTAINABILITY_THRESHOLDS_DAYS.aging) return 'aging';
+  if (days <= SUSTAINABILITY_THRESHOLDS_DAYS.stale) return 'stale';
+  return 'dead';
+}
+
 // ---- setup & session ----
 
 export interface SetupStatus {
@@ -223,6 +255,12 @@ export interface Project {
   countOutdatedMinor: number;
   countOutdatedPatch: number;
   lastScannedCommitSha: string | null;
+  /** Committer date of the cloned HEAD, read straight out of the clone
+   * (docs/CONCEPT.md 5.1) — null before the first successful clone. */
+  lastCommitAt: number | null;
+  /** Derived from lastCommitAt via sustainabilityStatusFor — sent from the
+   * API rather than recomputed per-consumer so "now" is consistent. */
+  sustainabilityStatus: SustainabilityStatus;
 }
 
 export interface ProjectSettingsUpdate {
@@ -461,4 +499,55 @@ export interface ScanEvent {
   projectId: number;
   scanId: number | null;
   status: ScanStatus;
+}
+
+// ---- audit log (docs/CONCEPT.md 2.2, 4, 6.2) ----
+//
+// Security-relevant, state-changing actions only — not every GET request and
+// not routine finding suppression (noise, no security value). Admin-only.
+
+export const AUDIT_LOG_ACTIONS = [
+  'auth.login',
+  'auth.login_failed',
+  'auth.logout',
+  'user.create',
+  'user.role_change',
+  'user.delete',
+  'git_account.connect',
+  'git_account.reconnect',
+  'git_account.delete',
+  'project.import',
+  'project.delete',
+  'scan.trigger',
+  'scan.cancel',
+  'settings.update',
+  'notification_channel.create',
+  'notification_channel.delete',
+] as const;
+
+export type AuditLogAction = (typeof AUDIT_LOG_ACTIONS)[number];
+
+export interface AuditLogEntry {
+  id: number;
+  /** Null when the acting user was later deleted, or for a failed login
+   * attempt that never resolved to an account. */
+  userId: number | null;
+  /** Snapshot of the username at the time of the action — survives a later
+   * user deletion or rename, unlike a join against `users`. */
+  username: string | null;
+  ip: string | null;
+  action: AuditLogAction;
+  resourceType: string | null;
+  resourceId: string | null;
+  /** Small, non-secret context, e.g. { fullName } or { from, to }. Never a
+   * token, password or raw secret (docs/CONCEPT.md 4.3's rule applies here
+   * too: nothing sensitive gets a second home outside its own table). */
+  meta: Record<string, unknown> | null;
+  createdAt: number;
+}
+
+/** GET /api/audit-log — admin only, newest first, cursor-paginated. */
+export interface AuditLogList {
+  entries: AuditLogEntry[];
+  hasMore: boolean;
 }

@@ -5,6 +5,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { listGitAccounts } from '../accounts/git-accounts.js';
+import { recordAuditLog } from '../audit/log.js';
 import { requireSameOrigin } from '../auth/session.js';
 import {
   adminAccountExists,
@@ -52,6 +53,12 @@ export function registerSetupRoutes(app: FastifyInstance): void {
     // Log the new admin straight in — they just proved they own the instance.
     request.session.userId = user.id;
     request.session.username = user.username;
+    recordAuditLog(request, {
+      action: 'user.create',
+      resourceType: 'user',
+      resourceId: user.id,
+      meta: { role: 'admin', via: 'setup_wizard' },
+    });
 
     return reply.status(201).send({ id: user.id, username: user.username });
   });

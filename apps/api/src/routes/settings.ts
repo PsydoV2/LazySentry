@@ -6,6 +6,7 @@
 
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { recordAuditLog } from '../audit/log.js';
 import { requireAuth, requireSameOrigin } from '../auth/session.js';
 import {
   getAppSettingsPublic,
@@ -45,6 +46,7 @@ export function registerSettingsRoutes(app: FastifyInstance): void {
       setScanScheduleWeekday(input.scanScheduleWeekday);
     }
 
+    recordAuditLog(request, { action: 'settings.update', meta: input });
     return getAppSettingsPublic();
   });
 }

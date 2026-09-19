@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { recordAuditLog } from '../audit/log.js';
 import { requireSameOrigin } from '../auth/session.js';
 import { getUserById, verifyCredentials } from '../auth/users.js';
 import { unauthorized } from '../lib/errors.js';
@@ -23,17 +24,29 @@ export function registerAuthRoutes(app: FastifyInstance): void {
       const user = await verifyCredentials(input.username, input.password);
       // One message for both wrong username and wrong password, so the
       // response does not reveal which usernames exist.
-      if (!user) throw unauthorized('Invalid username or password');
+      if (!user) {
+        recordAuditLog(request, {
+          action: 'auth.login_failed',
+          actor: { userId: null, username: input.username },
+        });
+        throw unauthorized('Invalid username or password');
+      }
 
       await request.session.regenerate();
       request.session.userId = user.id;
       request.session.username = user.username;
+      recordAuditLog(request, {
+        action: 'auth.login',
+        resourceType: 'user',
+        resourceId: user.id,
+      });
       return reply.send({ id: user.id, username: user.username, role: user.role });
     },
   );
 
   app.post('/api/auth/logout', async (request, reply) => {
     requireSameOrigin(request);
+    recordAuditLog(request, { action: 'auth.logout' });
     await request.session.destroy();
     return reply.status(204).send();
   });

@@ -148,6 +148,10 @@ export const projects = sqliteTable(
     countOutdatedMinor: integer('count_outdated_minor').notNull().default(0),
     countOutdatedPatch: integer('count_outdated_patch').notNull().default(0),
     lastScannedCommitSha: text('last_scanned_commit_sha'),
+    // Committer date of the cloned HEAD, read straight out of the clone
+    // (docs/CONCEPT.md 5.1) — feeds sustainabilityStatusFor() (2.2). Null
+    // until the first successful clone.
+    lastCommitAt: integer('last_commit_at', { mode: 'timestamp_ms' }),
   },
   (table) => [
     // A repository is imported once per connected account; a second import
@@ -333,3 +337,28 @@ export const notificationChannels = sqliteTable('notification_channels', {
   urlEncrypted: text('url_encrypted').notNull(),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 });
+
+/**
+ * Security-relevant, state-changing actions only (docs/CONCEPT.md 2.2, 6.2) —
+ * not every GET request and not routine finding suppression. `username` is a
+ * snapshot at the time of the action rather than a join against `users`, so
+ * the entry stays legible after the acting user is later deleted or renamed.
+ */
+export const auditLog = sqliteTable(
+  'audit_log',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    userId: integer('user_id').references(() => users.id, { onDelete: 'set null' }),
+    username: text('username'),
+    ip: text('ip'),
+    action: text('action').notNull(),
+    resourceType: text('resource_type'),
+    resourceId: text('resource_id'),
+    // Small, non-secret context (e.g. { fullName } or { from, to }) — never a
+    // token, password or raw secret (docs/CONCEPT.md 4.3's rule applies here
+    // too).
+    meta: text('meta', { mode: 'json' }).$type<Record<string, unknown>>(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [index('audit_log_created_at_idx').on(table.createdAt)],
+);

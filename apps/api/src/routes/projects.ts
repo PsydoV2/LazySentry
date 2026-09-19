@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
+import { recordAuditLog } from '../audit/log.js';
 import { requireAuth, requireSameOrigin } from '../auth/session.js';
 import { db } from '../db/client.js';
 import {
@@ -266,6 +267,12 @@ export function registerProjectRoutes(app: FastifyInstance): void {
         trigger: 'manual',
         ...(input.full ? { fullRescan: true } : {}),
       });
+      recordAuditLog(request, {
+        action: 'scan.trigger',
+        resourceType: 'project',
+        resourceId: project.id,
+        meta: { fullName: project.fullName, full: input.full ?? false },
+      });
       return reply.status(202).send({ jobId: job.id, status: job.status });
     },
   );
@@ -281,6 +288,12 @@ export function registerProjectRoutes(app: FastifyInstance): void {
       if (result === 'not_found') {
         throw notFound('No active scan to cancel');
       }
+      recordAuditLog(request, {
+        action: 'scan.cancel',
+        resourceType: 'project',
+        resourceId: project.id,
+        meta: { fullName: project.fullName },
+      });
       return reply.status(result === 'cancelled' ? 200 : 202).send({ status: result });
     },
   );
@@ -291,6 +304,12 @@ export function registerProjectRoutes(app: FastifyInstance): void {
     const project = requireProject(request.params);
     // Scans, packages and findings cascade from the project row.
     db.delete(projects).where(eq(projects.id, project.id)).run();
+    recordAuditLog(request, {
+      action: 'project.delete',
+      resourceType: 'project',
+      resourceId: project.id,
+      meta: { fullName: project.fullName },
+    });
     return reply.status(204).send();
   });
 

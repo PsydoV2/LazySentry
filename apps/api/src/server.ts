@@ -16,6 +16,7 @@ import { config } from './config.js';
 import { runMigrations } from './db/client.js';
 import { ScanEventStream } from './events/scan-events.js';
 import { AppError, NOT_FOUND_BODY, registerErrorHandler } from './lib/errors.js';
+import { registerAuditLogRoutes } from './routes/audit-log.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerEventRoutes } from './routes/events.js';
 import { registerGitAccountRoutes } from './routes/git-accounts.js';
@@ -86,6 +87,7 @@ export async function startApi(): Promise<FastifyInstance> {
   app.get('/api/health', async () => ({ status: 'ok' }));
 
   registerSetupRoutes(app);
+  registerAuditLogRoutes(app);
   registerAuthRoutes(app);
   registerGitAccountRoutes(app);
   registerNotificationChannelRoutes(app);
