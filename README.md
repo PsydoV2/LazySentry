@@ -1,10 +1,17 @@
-# LazySentry
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/logo/wordmark-dark.svg">
+    <img src="docs/brand/logo/wordmark-light.svg" alt="LazySentry" width="360">
+  </picture>
+</p>
 
-**Self-hosted security & maintenance dashboard for your repositories.**
+<p align="center"><strong>Self-hosted security & maintenance dashboard for your repositories.</strong></p>
 
-[![Build](https://github.com/PsydoV2/LazySentry/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/PsydoV2/LazySentry/actions/workflows/docker-publish.yml)
-[![License: MIT](https://img.shields.io/github/license/PsydoV2/LazySentry)](LICENSE)
-[![Docker Image](https://img.shields.io/badge/ghcr.io-psydov2%2Flazysentry-blue?logo=docker)](https://github.com/PsydoV2/LazySentry/pkgs/container/lazysentry)
+<p align="center">
+  <a href="https://github.com/PsydoV2/LazySentry/actions/workflows/docker-publish.yml"><img src="https://github.com/PsydoV2/LazySentry/actions/workflows/docker-publish.yml/badge.svg" alt="Build"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/PsydoV2/LazySentry" alt="License: MIT"></a>
+  <a href="https://github.com/PsydoV2/LazySentry/pkgs/container/lazysentry"><img src="https://img.shields.io/badge/ghcr.io-psydov2%2Flazysentry-blue?logo=docker" alt="Docker Image"></a>
+</p>
 
 One `docker compose up -d`, one browser tab — and for every repository you care about you can see:
 
@@ -14,8 +21,19 @@ One `docker compose up -d`, one browser tab — and for every repository you car
 
 > **Status: MVP.** Dependency/CVE tracking, version auditing, secret detection, GitHub/GitLab import (several accounts at once) and the dashboard are implemented and covered by tests. Pre-1.0 — expect rough edges, and see the roadmap below for what's intentionally not here yet.
 
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/Dashboard.png" alt="LazySentry dashboard with pinned and grouped projects, each card showing scan status and finding counts" width="800">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/Settings.png" alt="LazySentry settings dialog with connected Git accounts and notification channels" width="800">
+</p>
+
 ## Contents
 
+- [Screenshots](#screenshots)
 - [Who is this for?](#who-is-this-for)
 - [Design principles](#design-principles)
 - [Architecture](#architecture)
