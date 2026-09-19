@@ -3,8 +3,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Project } from '@lazysentry/shared';
 import { api, ApiError, type Scan } from '../lib/api';
-import { formatDateTime, formatDuration, shortSha } from '../lib/format';
+import { formatDateTime, formatDuration, relativeTime, shortSha } from '../lib/format';
 import { scanNotes } from '../lib/scan-messages';
+import { SustainabilityBadge } from './SustainabilityBadge';
 
 export function OverviewTab({ project }: { project: Project }) {
   const queryClient = useQueryClient();
@@ -41,6 +42,13 @@ export function OverviewTab({ project }: { project: Project }) {
             ) : (
               <span className="subtle">This project has not been scanned yet.</span>
             )}
+            <span className="row" style={{ gap: 6 }}>
+              <span className="subtle">
+                Last commit{' '}
+                {project.lastCommitAt ? relativeTime(project.lastCommitAt) : 'unknown'}
+              </span>
+              <SustainabilityBadge status={project.sustainabilityStatus} />
+            </span>
           </div>
           <button
             type="button"

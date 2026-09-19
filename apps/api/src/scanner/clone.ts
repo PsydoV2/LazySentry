@@ -73,7 +73,7 @@ export async function cloneRepository(
   token?: string,
   signal?: AbortSignal,
   authUsername = 'x-access-token',
-): Promise<{ commitSha: string }> {
+): Promise<{ commitSha: string; lastCommitAt: Date | null }> {
   const clone = await execute(
     'git',
     ['clone', '--quiet', '--', cloneUrl, targetDir],
@@ -107,7 +107,29 @@ export async function cloneRepository(
     throw new CloneError('could not determine HEAD commit of cloned repository');
   }
 
-  return { commitSha: revParse.stdout.trim() };
+  // Committer date of HEAD, straight out of the history already on disk — no
+  // extra network call, and more accurate than a provider's "updated_at"
+  // (which also moves on issues/stars). Feeds sustainabilityStatusFor()
+  // (docs/CONCEPT.md 2.2). A failure here is not fatal to the scan itself —
+  // the sustainability signal is informational, never guessed (11.): a
+  // missing date stays null rather than becoming a fabricated one.
+  const lastCommitAt = await readLastCommitDate(targetDir, signal);
+
+  return { commitSha: revParse.stdout.trim(), lastCommitAt };
+}
+
+async function readLastCommitDate(
+  targetDir: string,
+  signal?: AbortSignal,
+): Promise<Date | null> {
+  const log = await execute(
+    'git',
+    ['-C', targetDir, 'log', '-1', '--format=%cI', 'HEAD'],
+    { timeoutMs: 30_000, signal },
+  );
+  if (log.exitCode !== 0) return null;
+  const date = new Date(log.stdout.trim());
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 export async function removeScanDir(dir: string): Promise<void> {

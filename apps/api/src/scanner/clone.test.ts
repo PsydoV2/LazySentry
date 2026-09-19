@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest';
-import { cloneEnv } from './clone.js';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
+import { cloneEnv, cloneRepository, removeScanDir } from './clone.js';
+import { execute } from './exec.js';
 
 describe('cloneEnv', () => {
   it('adds no credentials for an anonymous (public, no-token) clone', () => {
@@ -40,5 +44,42 @@ describe('cloneEnv', () => {
     expect(gitlab.GIT_CONFIG_VALUE_0).toBe(
       `Authorization: Basic ${Buffer.from('oauth2:t').toString('base64')}`,
     );
+  });
+});
+
+describe('cloneRepository', () => {
+  const dirsToClean: string[] = [];
+
+  afterEach(async () => {
+    while (dirsToClean.length > 0) {
+      await removeScanDir(dirsToClean.pop()!);
+    }
+  });
+
+  it('captures the committer date of HEAD alongside the commit sha (sustainability score, docs/CONCEPT.md 2.2)', async () => {
+    const sourceDir = mkdtempSync(path.join(tmpdir(), 'lazysentry-source-'));
+    dirsToClean.push(sourceDir);
+    const env = { ...process.env, GIT_AUTHOR_NAME: 'Test', GIT_AUTHOR_EMAIL: 't@example.com' };
+    await execute('git', ['-C', sourceDir, 'init', '--quiet'], { timeoutMs: 10_000, env });
+    await execute('git', ['-C', sourceDir, 'config', 'user.email', 't@example.com'], {
+      timeoutMs: 10_000,
+    });
+    await execute('git', ['-C', sourceDir, 'config', 'user.name', 'Test'], { timeoutMs: 10_000 });
+    await execute('git', ['-C', sourceDir, 'commit', '--allow-empty', '-m', 'initial'], {
+      timeoutMs: 10_000,
+      env: { ...env, GIT_COMMITTER_DATE: '2024-03-01T12:00:00Z', GIT_AUTHOR_DATE: '2024-03-01T12:00:00Z' },
+    });
+    const revParse = await execute('git', ['-C', sourceDir, 'rev-parse', 'HEAD'], {
+      timeoutMs: 10_000,
+    });
+    const expectedSha = revParse.stdout.trim();
+
+    const targetDir = path.join(tmpdir(), `lazysentry-clone-target-${Date.now()}`);
+    dirsToClean.push(targetDir);
+    const { commitSha, lastCommitAt } = await cloneRepository(sourceDir, targetDir);
+
+    expect(commitSha).toBe(expectedSha);
+    expect(lastCommitAt).not.toBeNull();
+    expect(lastCommitAt!.toISOString()).toBe('2024-03-01T12:00:00.000Z');
   });
 });

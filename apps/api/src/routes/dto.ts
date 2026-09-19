@@ -4,14 +4,15 @@
 // milliseconds. Mapping here keeps that conversion in one place instead of in
 // every route (docs/CONCEPT.md 3.4).
 
-import type {
-  PackageEntry,
-  Project,
-  ProjectSection,
-  ScanState,
-  Scan,
-  Secret,
-  Vulnerability,
+import {
+  sustainabilityStatusFor,
+  type PackageEntry,
+  type Project,
+  type ProjectSection,
+  type ScanState,
+  type Scan,
+  type Secret,
+  type Vulnerability,
 } from '@lazysentry/shared';
 import type {
   packages,
@@ -67,6 +68,8 @@ export function toProjectDto(
     countOutdatedMinor: row.countOutdatedMinor,
     countOutdatedPatch: row.countOutdatedPatch,
     lastScannedCommitSha: row.lastScannedCommitSha,
+    lastCommitAt: ms(row.lastCommitAt),
+    sustainabilityStatus: sustainabilityStatusFor(ms(row.lastCommitAt)),
   };
 }
 

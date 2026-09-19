@@ -9,6 +9,7 @@
     "dev:worker": "tsx watch src/worker.ts",
     "db:generate": "drizzle-kit generate",
     "scan:once": "tsx src/scripts/scan-once.ts",
+    "scanner:checksums": "tsx src/scripts/print-scanner-checksums.ts",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests"

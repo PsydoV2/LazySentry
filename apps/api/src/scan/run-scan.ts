@@ -83,6 +83,7 @@ export async function runScan(
   let secretsStatus = project.scanSecretsEnabled ? 'pending' : 'skipped';
   const failures: { code: string; message: string }[] = [];
   let commitSha: string | null = null;
+  let lastCommitAt: Date | null = null;
 
   const scanDir = newScanDir();
   try {
@@ -102,7 +103,7 @@ export async function runScan(
         : 'x-access-token';
 
     try {
-      ({ commitSha } = await cloneRepository(
+      ({ commitSha, lastCommitAt } = await cloneRepository(
         project.cloneUrl,
         scanDir,
         token,
@@ -242,7 +243,7 @@ export async function runScan(
   // scan instead of silently skipping everything before it
   // (docs/CONCEPT.md 5.4).
   const scannedCommitSha = secretsStatus === 'completed' ? commitSha : null;
-  updateProjectAfterScan(projectId, scanId, status, finishedAt, scannedCommitSha, {
+  updateProjectAfterScan(projectId, scanId, status, finishedAt, scannedCommitSha, lastCommitAt, {
     // Package rows are a per-scan snapshot, not reconciled like findings
     // (5.4/4.1) — if this scan didn't produce a fresh inventory (no
     // lockfiles, or the deps scanner failed), there are 0 rows for this
@@ -515,6 +516,7 @@ function updateProjectAfterScan(
   status: string,
   finishedAt: Date,
   commitSha: string | null,
+  lastCommitAt: Date | null,
   options: { hasFreshPackageInventory: boolean },
 ): void {
   const openFindingCounts = recomputeOpenFindingCounts(projectId);
@@ -554,6 +556,7 @@ function updateProjectAfterScan(
       ...openFindingCounts,
       ...outdatedCounts,
       ...(commitSha ? { lastScannedCommitSha: commitSha } : {}),
+      ...(lastCommitAt ? { lastCommitAt } : {}),
     })
     .where(eq(projects.id, projectId))
     .run();

@@ -8,6 +8,7 @@ import type { ComponentType, MouseEvent } from 'react';
 import type { Project } from '@lazysentry/shared';
 import { cardStateFor, urgencyRank, type CardState } from '../lib/card-state';
 import { relativeTime } from '../lib/format';
+import { SustainabilityBadge } from './SustainabilityBadge';
 import {
   IconAlertTriangle,
   IconBug,
@@ -142,6 +143,7 @@ export function ProjectCard({
         <StatusGlyph project={project} state={state} color={accentColor} />
         <div className="project-card-pills">
           <FindingPills project={project} state={state} />
+          <SustainabilityBadge status={project.sustainabilityStatus} />
         </div>
       </div>
 

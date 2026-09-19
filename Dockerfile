@@ -3,7 +3,10 @@
 # Pinned scanner binaries (docs/CONCEPT.md 3.2) — exact tags, never `latest`:
 # both tools' JSON output has changed across releases, and an unpinned image
 # would silently break parsing on a rebuild months from now. Keep these in
-# sync with SCANNER_VERSIONS in apps/api/src/scanner/versions.ts.
+# sync with SCANNER_VERSIONS in apps/api/src/scanner/versions.ts. Whenever
+# these tags change, also regenerate SCANNER_CHECKSUMS (docs/CONCEPT.md 2.2,
+# 6.2) against the freshly built image:
+#   docker run --rm --entrypoint node <this-image> dist/scripts/print-scanner-checksums.js
 FROM ghcr.io/google/osv-scanner:v2.5.1 AS osv-scanner
 FROM ghcr.io/trufflesecurity/trufflehog:3.97.4 AS trufflehog
 

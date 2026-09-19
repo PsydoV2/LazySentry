@@ -19,8 +19,10 @@ import {
 import { recoverOrphanedScans } from './scan/recovery.js';
 import { runScan } from './scan/run-scan.js';
 import { enqueueDueScheduledScans } from './scan/schedule.js';
+import { checkScannerChecksums } from './scanner/checksum.js';
 import { cleanupOrphanedScanDirs } from './scanner/clone.js';
 import { execute } from './scanner/exec.js';
+import { SCANNER_VERSIONS } from './scanner/versions.js';
 
 const POLL_INTERVAL_MS = 1000;
 // The schedule check runs on its own cadence inside the same poll loop
@@ -55,6 +57,43 @@ async function checkScannerBinaries(): Promise<void> {
           `Scans will record this scanner as failed — set ${envVar} to a working binary.`,
       );
     }
+  }
+}
+
+/**
+ * Checksum verification of the scanner binaries (docs/CONCEPT.md 2.2, 6.2).
+ * A mismatch is a compromise indicator, not a normal operating state — the
+ * worker refuses to start rather than run untrusted repo content through a
+ * binary it can no longer vouch for (threat model 6.1). Unpinned is only a
+ * warning: it must stay visible rather than look like a passed check.
+ */
+async function verifyScannerChecksums(): Promise<void> {
+  const results = await checkScannerChecksums([
+    { name: 'osv-scanner', binaryPath: config.OSV_SCANNER_PATH },
+    { name: 'trufflehog', binaryPath: config.TRUFFLEHOG_PATH },
+  ]);
+
+  const mismatches = results.filter((r) => r.status === 'mismatch');
+  for (const result of results) {
+    if (result.status === 'unpinned') {
+      log(
+        `WARNING: no pinned checksum for ${result.name} ${SCANNER_VERSIONS[result.name]} — ` +
+          `checksum verification is not active for this binary. See scanner/versions.ts.`,
+      );
+    } else if (result.status === 'mismatch') {
+      log(
+        `CRITICAL: ${result.name} binary checksum does not match the pinned value ` +
+          `(expected ${result.expected}, got ${result.actual}). Refusing to start.`,
+      );
+    }
+    // 'binary_not_found' is already reported by checkScannerBinaries above.
+  }
+
+  if (mismatches.length > 0) {
+    throw new Error(
+      `Scanner checksum mismatch for: ${mismatches.map((r) => r.name).join(', ')}. ` +
+        'This can mean the image was tampered with — refusing to start the worker.',
+    );
   }
 }
 
@@ -106,6 +145,7 @@ export async function startWorker(): Promise<void> {
   runMigrations();
 
   await checkScannerBinaries();
+  await verifyScannerChecksums();
 
   const orphanDirs = await cleanupOrphanedScanDirs();
   if (orphanDirs.length > 0) {
