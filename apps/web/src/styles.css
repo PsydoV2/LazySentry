@@ -546,14 +546,25 @@ button:disabled {
 }
 
 .code-block {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
   margin: var(--space-1) 0 0;
-  padding: 8px 12px;
+  padding: 8px 8px 8px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg);
   font-family: var(--font-mono);
   font-size: 12px;
+}
+
+.code-block-command {
   overflow-x: auto;
+}
+
+.code-block-copy {
+  flex-shrink: 0;
 }
 
 /* ---------- lists ---------- */

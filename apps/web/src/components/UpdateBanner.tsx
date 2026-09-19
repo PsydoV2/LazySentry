@@ -7,8 +7,32 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api, type VersionInfo } from '../lib/api';
-import { IconX } from './icons';
+import { IconCheck, IconCopy, IconX } from './icons';
 import { Modal } from './Modal';
+
+function CopyCommand({ command }: { command: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    await navigator.clipboard.writeText(command);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  return (
+    <pre className="code-block">
+      <span className="code-block-command">{command}</span>
+      <button
+        type="button"
+        className="icon-btn code-block-copy"
+        aria-label="Copy command"
+        onClick={copy}
+      >
+        {copied ? <IconCheck /> : <IconCopy />}
+      </button>
+    </pre>
+  );
+}
 
 export function UpdateBanner() {
   const [dismissed, setDismissed] = useState(false);
@@ -64,15 +88,15 @@ export function UpdateBanner() {
             <ol className="update-steps">
               <li>
                 Pull the new image
-                <pre className="code-block">docker compose pull</pre>
+                <CopyCommand command="docker compose pull" />
               </li>
               <li>
                 Recreate the containers with it
-                <pre className="code-block">docker compose up -d</pre>
+                <CopyCommand command="docker compose up -d" />
               </li>
               <li>
                 Remove the now-unused old image
-                <pre className="code-block">docker image prune -f</pre>
+                <CopyCommand command="docker image prune -f" />
               </li>
             </ol>
             <p className="subtle">

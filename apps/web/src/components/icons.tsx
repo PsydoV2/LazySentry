@@ -326,6 +326,15 @@ export function IconGripVertical(props: IconProps) {
   );
 }
 
+export function IconCopy(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <rect x="8.5" y="8.5" width="11.5" height="11.5" rx="1.5" />
+      <path d="M15.5 8.5V5.5A1.5 1.5 0 0 0 14 4H5.5A1.5 1.5 0 0 0 4 5.5V14a1.5 1.5 0 0 0 1.5 1.5h3" />
+    </svg>
+  );
+}
+
 export function IconTrash(props: IconProps) {
   return (
     <svg {...base(props)}>
