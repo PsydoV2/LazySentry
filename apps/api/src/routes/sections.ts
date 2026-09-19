@@ -8,7 +8,7 @@ import { asc, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { requireAuth, requireSameOrigin } from '../auth/session.js';
 import { db } from '../db/client.js';
-import { projectSections } from '../db/schema.js';
+import { projects, projectSections } from '../db/schema.js';
 import { notFound } from '../lib/errors.js';
 import { toSectionDto } from './dto.js';
 
@@ -111,9 +111,16 @@ export function registerSectionRoutes(app: FastifyInstance): void {
     requireAuth(request);
     requireSameOrigin(request);
     const section = requireSection(request.params);
-    // Member projects fall back to no section automatically
-    // (schema: section_id ON DELETE SET NULL) and reappear in the leftover
-    // group instead of vanishing from the dashboard.
+    // schema.ts declares section_id ON DELETE SET NULL, but the migration
+    // that added the column (0007, `ALTER TABLE ... ADD section_id integer
+    // REFERENCES ...`) predates that and never carried the clause into the
+    // actual column — SQLite has no ALTER TABLE that can attach it
+    // retroactively without a full table rebuild. So every install's live
+    // schema defaults to NO ACTION here, and just deleting the section row
+    // trips a FOREIGN KEY constraint failure the moment it still has
+    // members. Detached explicitly instead, so members reappear in the
+    // leftover group rather than blocking the delete.
+    db.update(projects).set({ sectionId: null }).where(eq(projects.sectionId, section.id)).run();
     db.delete(projectSections).where(eq(projectSections.id, section.id)).run();
     return reply.status(204).send();
   });
