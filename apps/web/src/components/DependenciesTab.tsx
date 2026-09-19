@@ -5,6 +5,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EmptyState } from './EmptyState';
+import { Select } from './Select';
 import { api, type PackageEntry, type Project, type Vulnerability } from '../lib/api';
 import { IconAlertTriangle, IconBug, IconChevronDown, IconFolder, IconPackage } from './icons';
 
@@ -166,14 +167,15 @@ export function DependenciesTab({ project }: { project: Project }) {
           style={{ maxWidth: 240 }}
         />
         {ecosystems.length > 1 && (
-          <select value={ecosystem} onChange={(event) => setEcosystem(event.target.value)}>
-            <option value="">All ecosystems</option>
-            {ecosystems.map((eco) => (
-              <option key={eco} value={eco}>
-                {eco}
-              </option>
-            ))}
-          </select>
+          <Select
+            value={ecosystem}
+            ariaLabel="Filter by ecosystem"
+            options={[
+              { value: '', label: 'All ecosystems' },
+              ...ecosystems.map((eco) => ({ value: eco, label: eco })),
+            ]}
+            onChange={setEcosystem}
+          />
         )}
         <label className="row" style={{ gap: 6 }}>
           <input

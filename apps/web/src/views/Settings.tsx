@@ -20,6 +20,8 @@ import {
   IconUsers,
 } from '../components/icons';
 import { Modal } from '../components/Modal';
+import { Popup } from '../components/Popup';
+import { Select, type SelectOption } from '../components/Select';
 import {
   api,
   ApiError,
@@ -44,6 +46,11 @@ const SCHEDULE_PRESETS: { hours: number; label: string }[] = [
   { hours: 24 * 7, label: 'Weekly' },
 ];
 
+const ROLE_OPTIONS: SelectOption<UserRole>[] = [
+  { value: 'member', label: 'Member' },
+  { value: 'admin', label: 'Admin' },
+];
+
 function ProviderIcon({ provider }: { provider: string }) {
   return provider === 'gitlab' ? <IconGitlab /> : <IconGithub />;
 }
@@ -58,7 +65,6 @@ export function Settings({
   const isAdmin = currentUser.role === 'admin';
   const queryClient = useQueryClient();
   const [addingProvider, setAddingProvider] = useState<GitProviderId | null>(null);
-  const [justConnected, setJustConnected] = useState<ConnectResult | null>(null);
 
   const accounts = useQuery({
     queryKey: ['git-accounts'],
@@ -77,12 +83,6 @@ export function Settings({
 
   function toggleAddProvider(id: GitProviderId): void {
     setAddingProvider((current) => (current === id ? null : id));
-    setJustConnected(null);
-  }
-
-  function closeAddForm(): void {
-    setAddingProvider(null);
-    setJustConnected(null);
   }
 
   return (
@@ -140,34 +140,19 @@ export function Settings({
               onChanged={invalidateAccounts}
             />
           ))}
-
-          {isAdmin && addingProvider && (
-            <div className="stack" style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--space-3)' }}>
-              {justConnected ? (
-                <>
-                  <p className="notice notice-info">
-                    Connected as {justConnected.account.username}.
-                  </p>
-                  <TokenScopeWarning result={justConnected} />
-                </>
-              ) : (
-                <ConnectGitAccount
-                  key={addingProvider}
-                  fixedProvider={addingProvider}
-                  onConnected={(result) => {
-                    setJustConnected(result);
-                    invalidateAccounts();
-                  }}
-                />
-              )}
-              <div>
-                <button type="button" className="btn-quiet" onClick={closeAddForm}>
-                  {justConnected ? 'Done' : 'Cancel'}
-                </button>
-              </div>
-            </div>
-          )}
         </div>
+
+        {isAdmin && addingProvider && (
+          <AddAccountPopup
+            provider={addingProvider}
+            label={
+              providers.data?.providers.find((p) => p.id === addingProvider)?.label ??
+              addingProvider
+            }
+            onClose={() => setAddingProvider(null)}
+            onConnected={invalidateAccounts}
+          />
+        )}
 
         <NotificationsCard />
         <ScanScheduleCard />
@@ -185,6 +170,48 @@ export function Settings({
         </div>
       </div>
     </Modal>
+  );
+}
+
+/** Popup for connecting a new account (docs/CONCEPT.md 6.2). */
+function AddAccountPopup({
+  provider,
+  label,
+  onClose,
+  onConnected,
+}: {
+  provider: GitProviderId;
+  label: string;
+  onClose: () => void;
+  onConnected: () => void;
+}) {
+  const [justConnected, setJustConnected] = useState<ConnectResult | null>(null);
+
+  return (
+    <Popup
+      title={`Connect ${label}`}
+      onClose={onClose}
+      footer={
+        <button type="button" className="btn-quiet" onClick={onClose}>
+          {justConnected ? 'Done' : 'Cancel'}
+        </button>
+      }
+    >
+      {justConnected ? (
+        <>
+          <p className="notice notice-info">Connected as {justConnected.account.username}.</p>
+          <TokenScopeWarning result={justConnected} />
+        </>
+      ) : (
+        <ConnectGitAccount
+          fixedProvider={provider}
+          onConnected={(result) => {
+            setJustConnected(result);
+            onConnected();
+          }}
+        />
+      )}
+    </Popup>
   );
 }
 
@@ -334,17 +361,13 @@ function ScanScheduleCard() {
 
       {appSettings.data && (
         <div>
-          <select
+          <Select
             value={appSettings.data.scanScheduleIntervalHours}
             disabled={save.isPending}
-            onChange={(event) => save.mutate(Number(event.target.value))}
-          >
-            {SCHEDULE_PRESETS.map((preset) => (
-              <option key={preset.hours} value={preset.hours}>
-                {preset.label}
-              </option>
-            ))}
-          </select>
+            ariaLabel="Scan schedule"
+            options={SCHEDULE_PRESETS.map((preset) => ({ value: preset.hours, label: preset.label }))}
+            onChange={(hours) => save.mutate(hours)}
+          />
         </div>
       )}
 
@@ -495,9 +518,6 @@ function AccountRow({
 function UsersCard({ currentUserId }: { currentUserId: number }) {
   const queryClient = useQueryClient();
   const [adding, setAdding] = useState(false);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [role, setRole] = useState<UserRole>('member');
 
   const users = useQuery({
     queryKey: ['users'],
@@ -506,22 +526,6 @@ function UsersCard({ currentUserId }: { currentUserId: number }) {
 
   function invalidateUsers(): void {
     queryClient.invalidateQueries({ queryKey: ['users'] });
-  }
-
-  const create = useMutation({
-    mutationFn: () => api.post<AppUser>('/api/users', { username, password, role }),
-    onSuccess: () => {
-      setAdding(false);
-      setUsername('');
-      setPassword('');
-      setRole('member');
-      invalidateUsers();
-    },
-  });
-
-  function handleSubmit(event: FormEvent) {
-    event.preventDefault();
-    create.mutate();
   }
 
   return (
@@ -551,78 +555,85 @@ function UsersCard({ currentUserId }: { currentUserId: number }) {
         />
       ))}
 
-      {!adding ? (
-        <div>
-          <button type="button" className="btn-quiet" onClick={() => setAdding(true)}>
-            <IconPlus /> Add user
-          </button>
-        </div>
-      ) : (
-        <form
-          className="stack"
-          style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--space-3)' }}
-          onSubmit={handleSubmit}
-        >
-          <div>
-            <label htmlFor="new-user-username">Username</label>
-            <input
-              id="new-user-username"
-              value={username}
-              autoComplete="off"
-              onChange={(event) => setUsername(event.target.value)}
-            />
-          </div>
-          <div>
-            <label htmlFor="new-user-password">Initial password</label>
-            <input
-              id="new-user-password"
-              type="password"
-              value={password}
-              autoComplete="new-password"
-              onChange={(event) => setPassword(event.target.value)}
-            />
-            <p className="field-hint">At least 12 characters. The user can change it later.</p>
-          </div>
-          <div>
-            <label htmlFor="new-user-role">Role</label>
-            <select
-              id="new-user-role"
-              value={role}
-              onChange={(event) => setRole(event.target.value as UserRole)}
-            >
-              <option value="member">Member</option>
-              <option value="admin">Admin</option>
-            </select>
-          </div>
-          {create.isError && (
-            <p className="notice notice-error">
-              {create.error instanceof ApiError ? create.error.message : 'Could not create user.'}
-            </p>
-          )}
-          <div className="row">
-            <button
-              type="submit"
-              className="btn-primary"
-              disabled={create.isPending || username.trim() === '' || password.trim() === ''}
-            >
-              {create.isPending ? 'Creating…' : 'Create user'}
-            </button>
-            <button
-              type="button"
-              className="btn-quiet"
-              onClick={() => {
-                setAdding(false);
-                setUsername('');
-                setPassword('');
-                setRole('member');
-              }}
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
+      <div>
+        <button type="button" className="btn-quiet" onClick={() => setAdding(true)}>
+          <IconPlus /> Add user
+        </button>
+      </div>
+
+      {adding && (
+        <AddUserPopup onClose={() => setAdding(false)} onCreated={invalidateUsers} />
       )}
     </div>
+  );
+}
+
+/** Popup for creating a new user (docs/CONCEPT.md 2.6). */
+function AddUserPopup({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [role, setRole] = useState<UserRole>('member');
+
+  const create = useMutation({
+    mutationFn: () => api.post<AppUser>('/api/users', { username, password, role }),
+    onSuccess: () => {
+      onCreated();
+      onClose();
+    },
+  });
+
+  function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    create.mutate();
+  }
+
+  return (
+    <Popup title="Add user" onClose={onClose}>
+      <form className="stack" onSubmit={handleSubmit}>
+        <div>
+          <label htmlFor="new-user-username">Username</label>
+          <input
+            id="new-user-username"
+            type="text"
+            value={username}
+            autoComplete="off"
+            onChange={(event) => setUsername(event.target.value)}
+          />
+        </div>
+        <div>
+          <label htmlFor="new-user-password">Initial password</label>
+          <input
+            id="new-user-password"
+            type="password"
+            value={password}
+            autoComplete="new-password"
+            onChange={(event) => setPassword(event.target.value)}
+          />
+          <p className="field-hint">At least 12 characters. The user can change it later.</p>
+        </div>
+        <div>
+          <label htmlFor="new-user-role">Role</label>
+          <Select id="new-user-role" value={role} options={ROLE_OPTIONS} onChange={setRole} />
+        </div>
+        {create.isError && (
+          <p className="notice notice-error">
+            {create.error instanceof ApiError ? create.error.message : 'Could not create user.'}
+          </p>
+        )}
+        <div className="row">
+          <button
+            type="submit"
+            className="btn-primary"
+            disabled={create.isPending || username.trim() === '' || password.trim() === ''}
+          >
+            {create.isPending ? 'Creating…' : 'Create user'}
+          </button>
+          <button type="button" className="btn-quiet" onClick={onClose}>
+            Cancel
+          </button>
+        </div>
+      </form>
+    </Popup>
   );
 }
 
@@ -669,14 +680,13 @@ function UserRow({
           </span>
         </span>
         <span className="row">
-          <select
+          <Select
             value={user.role}
             disabled={isSelf || changeRole.isPending}
-            onChange={(event) => changeRole.mutate(event.target.value as UserRole)}
-          >
-            <option value="member">Member</option>
-            <option value="admin">Admin</option>
-          </select>
+            ariaLabel={`Role for ${user.username}`}
+            options={ROLE_OPTIONS}
+            onChange={(role) => changeRole.mutate(role)}
+          />
           {!isSelf && !confirmingRemove && (
             <button
               type="button"

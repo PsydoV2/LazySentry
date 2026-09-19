@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Select } from './Select';
 import {
   api,
   ApiError,
@@ -79,17 +80,12 @@ export function ConnectGitAccount({ onConnected, submitLabel = 'Connect', fixedP
       {!fixedProvider && (
         <div>
           <label htmlFor="provider">Provider</label>
-          <select
+          <Select
             id="provider"
             value={provider}
-            onChange={(event) => setProvider(event.target.value as GitProviderId)}
-          >
-            {(providers.data?.providers ?? []).map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label}
-              </option>
-            ))}
-          </select>
+            options={(providers.data?.providers ?? []).map((p) => ({ value: p.id, label: p.label }))}
+            onChange={setProvider}
+          />
         </div>
       )}
 
