@@ -1,6 +1,6 @@
 # Security & Maintenance Hub — Produktkonzept & Implementierungs-Spec
 
-> **Status:** v3 — final, bereit zur Übergabe an Entwicklungs-Agents
+> **Status:** v4 — laufende Spec nach abgeschlossenem MVP, wird bei Bedarf aktualisiert statt neu eingefroren (siehe 2.2)
 > **Zielgruppe dieses Dokuments:** Entwicklungs-Agents und Entwickler, die an diesem Projekt arbeiten.
 > **Sprache der Anwendung:** Englisch (alle UI-Strings, Logs, Doku, Commit-Messages).
 > **Sprache dieses Dokuments:** Deutsch.
@@ -66,7 +66,7 @@ Ein vollständig selbsthostbares Security- und Wartungs-Dashboard für einzelne 
 
 **Abgrenzung zum Markt.** Die einzelnen Scanner existieren bereits als exzellente Open-Source-Tools. Aggregations-Plattformen existieren ebenfalls, sind aber auf Enterprise-Teams zugeschnitten und entsprechend schwergewichtig (mehrere Services, Rollenmodelle, SLA-Tracking). Die Lücke, die dieses Projekt füllt: **ein Container, fünf Minuten Setup, für Leute mit fünf bis fünfzig Repositories.** Der Wert liegt nicht in eigenen Scan-Engines, sondern in Orchestrierung, Zustandsverfolgung über die Zeit und einer UI, die man freiwillig öffnet.
 
-**Datenhoheit.** In der MVP-Phase verlässt kein Quellcode die Infrastruktur des Nutzers. Diese Aussage muss ab Phase 3 (KI-Features) präzisiert werden — siehe Abschnitt 9.
+**Datenhoheit.** Bislang verlässt kein Quellcode die Infrastruktur des Nutzers. Diese Aussage muss präzisiert werden, sobald KI-Features dazukommen — siehe Abschnitt 9.
 
 ---
 
@@ -80,69 +80,29 @@ Ein vollständig selbsthostbares Security- und Wartungs-Dashboard für einzelne 
 4. **GitHub-Integration** — Verbinden eines Accounts per Personal Access Token, Import einzelner Repositories.
 5. **Dashboard** — Projekt-Cards im Grid mit Kurzüberblick, Detailansicht pro Projekt.
 
-### 2.2 Explizite Nicht-Ziele für das MVP
+### 2.2 Stand nach dem MVP
 
-> **Siehe 2.5:** Das MVP ist inzwischen abgeschlossen. Diese Liste ist kein
-> pauschales Verbot mehr, sondern der Ausgangszustand, aus dem heraus der
-> Projektinhaber einzelne Punkte gezielt freigibt — wie bereits bei
-> Multi-Provider (2.4) und License-Compliance (2.5) geschehen. Ohne dokumentierte
-> Freigabe hier gilt ein Punkt weiterhin als nicht angefangen.
+Das MVP (2.1) ist abgeschlossen. Bis 2026-09-18 wurde jede Erweiterung darüber hinaus einzeln in diesem Dokument freigegeben, bevor ein Agent damit anfangen durfte — sinnvoll, solange unklar war, wie viel über das MVP hinaus überhaupt gewünscht ist. Diese Unsicherheit besteht nicht mehr: der Großteil der ursprünglichen Nicht-Ziele ist inzwischen umgesetzt. Ab jetzt gilt normale iterative Weiterentwicklung — ein neues Feature braucht keinen eigenen, dokumentierten Freigabe-Abschnitt mehr, bevor daran gearbeitet werden darf. Diese Liste wird bei Bedarf aktualisiert, aber nicht mehr pro Feature neu eröffnet.
 
-Diese Punkte waren für das MVP selbst bewusst ausgeschlossen. Agents sollen sie ohne Freigabe laut 2.5 **nicht** vorwegnehmen, auch nicht „schon mal vorbereiten":
+**Umgesetzt:**
 
-- Mehrbenutzerbetrieb, Rollen, Teams — **teilweise freigegeben (Mehrbenutzerbetrieb + Rollen), siehe 2.6.** Echte Teams/Projekt-Gruppen bleiben Nicht-Ziel.
-- Webhooks, Tunneling, Event-getriebene Scans
-- KI-Features jeglicher Art
-- License-Compliance — **teilweise freigegeben, siehe 2.5**
-- PostgreSQL (SQLite reicht; die Abstraktion muss den späteren Wechsel erlauben)
-- SBOM-Export
+- **Multi-Provider & Mehrfach-Accounts.** GitHub und GitLab (inkl. selbst gehosteter Instanzen, `git_accounts.base_url`, `null` = gitlab.com), mehrere Accounts gleichzeitig verbunden, auch mehrere desselben Providers. Jedes Projekt hängt über `git_account_id` an genau einem Account; Scans nutzen ausschließlich dessen Token. Provider-Interface (`apps/api/src/providers/types.ts`): `validateToken`/`listRepositories` nehmen optional eine Basis-URL, jeder Provider deklariert `cloneAuthUsername` für den HTTP-Basic-Auth-User beim Clone (GitHub: `x-access-token`, GitLab: `oauth2`). Clone-Auth ist Host-basiert (`git config http.<origin>/.extraheader`), nicht hartcodiert auf `github.com`. Löschen eines Git-Accounts ist blockiert (409), solange noch Projekte daran hängen. Bitbucket/Gitea sind weiterhin nicht implementiert — die Registry in `apps/api/src/providers/index.ts` macht das Hinzufügen zu einer neuen Datei, aber niemand hat danach gefragt.
+- **Mehrbenutzerbetrieb, zwei Rollen.** Mehrere benannte Nutzer-Accounts auf derselben Instanz statt genau einem Admin, kein Self-Signup — neue Nutzer werden ausschließlich von einem `admin` in den Settings angelegt (Username + initiales Passwort). `admin` darf zusätzlich zu allem, was `member` darf: Git-Accounts verbinden/reconnecten/löschen, Nutzer anlegen/deaktivieren/Rolle ändern. `member` darf: Projekte importieren/ansehen/löschen, Scans auslösen/ansehen, Findings einsehen/suppressen, Projekt-Settings ändern, Notification-/Schedule-Settings ändern. Kein Team-Konzept: alle Nutzer einer Instanz teilen sich dieselben Projekte und Git-Accounts, keine projektbezogene Zugriffs-Isolation.
+- **Notifications.** Mehrere Kanäle gleichzeitig, auch mehrere desselben Typs — Discord, Slack und ein generischer Webhook (`apps/api/src/notifications/`, Tabelle `notification_channels`). Plattform-Interface analog zum Git-Provider-Muster; ein weiterer Kanal ist eine neue Datei, keine Änderung an bestehenden.
+- **Cron-Scheduling.** Ein global geteiltes Zeitfenster für alle Projekte, verankert an einer Uhrzeit (und für „wöchentlich" zusätzlich einem Wochentag) statt nur „alle N Stunden seit dem letzten Scan pro Projekt" (`apps/api/src/scan/schedule.ts`).
+- **Suppression-Workflow.** Eigenes `suppressed_at`-Feld pro Finding, unabhängig vom Reconciliation-Status (4.1) — ein stummgeschaltetes Finding bleibt stummgeschaltet, auch über künftige Scans hinweg, bis es explizit wieder aktiviert wird.
+- **License-Anzeige pro Paket.** Deklarierte Lizenz aus der jeweiligen Registry (npm `license`-Feld, Packagist `composer.json`-Metadaten, PyPI Klassifiers/Metadata, crates.io `license`-Feld), wie die Versions-Daten (5.3) 24h gecacht, als zusätzliche Spalte in der Dependencies-Tabelle (8.2). Feld `packages.license`: Rohwert bzw. `unknown`, wenn die Registry nichts liefert oder der Ausdruck nicht geparst werden kann — nicht raten. Rein informativ, **kein** Allow-/Denylist-Policy-Engine, keine automatische Copyleft/Permissive-Klassifizierung.
 
-> **Entscheidung 2026-09-13:** Multi-Provider/Multi-Account stand ursprünglich hier
-> (als Phase 6, siehe 2.3) und war für das MVP ausgeschlossen. Der Projektinhaber
-> hat das nach Fertigstellung des MVP bewusst vorgezogen — siehe 2.4.
+**Weiterhin offen** (kein Punkt hier braucht eine Einzelfreigabe mehr, aber auch keiner gilt als angefangen, bis tatsächlich daran gearbeitet wird):
 
-### 2.3 Roadmap (nach dem MVP)
-
-| Phase | Inhalt                                                                                |
-| ----- | ------------------------------------------------------------------------------------- |
-| **3** | Notifications (Discord-Webhook zuerst), Cron-Scheduling, Suppression-Workflow         |
-| **4** | EPSS- und CISA-KEV-Anreicherung zur Priorisierung, Sustainability-/Dead-Project-Score |
-| **5** | KI-Layer: Triage-Assistent, Reachability-Einschätzung, Upgrade-Assistent              |
-| **6** | SBOM-Export (CycloneDX), Webhooks                                                     |
-
-Die KI-Features sind bewusst spät angesetzt, aber sie sind fester Bestandteil der Produktvision — die Architektur muss sie ab Tag eins ermöglichen (siehe Abschnitt 9).
-
-### 2.4 Multi-Provider & Mehrfach-Accounts (vorgezogen, 2026-09-13)
-
-Ursprünglich Phase 6, auf expliziten Wunsch des Projektinhabers direkt nach dem MVP umgesetzt — nicht "schon mal vorbereitet", sondern bewusst vollständig gebaut:
-
-- **Mehrere Git-Accounts gleichzeitig verbunden**, auch mehrere desselben Providers (z. B. privater und geschäftlicher GitHub-Account). Jedes Projekt hängt über `git_account_id` an genau einem Account; Scans nutzen ausschließlich das Token des eigenen Accounts, nie „irgendein" verbundenes Konto.
-- **Zweiter Provider: GitLab**, inklusive selbst gehosteter Instanzen (`git_accounts.base_url`, `null` = gitlab.com). Das Provider-Interface (`apps/api/src/providers/types.ts`) ist entsprechend erweitert: `validateToken`/`listRepositories` nehmen optional eine Basis-URL, jeder Provider deklariert `cloneAuthUsername` für den HTTP-Basic-Auth-User beim Clone (GitHub: `x-access-token`, GitLab: `oauth2`).
-- **Clone-Auth ist jetzt Host-basiert statt hartcodiert auf `github.com`** (`git config http.<origin>/.extraheader`) — Voraussetzung dafür, dass ein Token nicht versehentlich an den falschen Host geht, sobald mehrere Hosts im Spiel sind.
-- Bitbucket/Gitea sind weiterhin **nicht** implementiert — die Registry in `apps/api/src/providers/index.ts` macht das Hinzufügen eines weiteren Providers zu einer neuen Datei, aber niemand hat danach gefragt.
-- Löschen eines Git-Accounts ist blockiert (409), solange noch Projekte daran hängen (`DELETE /api/git-accounts/:id`) — das DB-Schema erlaubt zwar `ON DELETE CASCADE`, das wird aber nicht stillschweigend ausgelöst.
-
-### 2.5 MVP abgeschlossen — Nicht-Ziele werden ab jetzt einzeln freigegeben (2026-09-18)
-
-Das MVP (Phase 1–2 aus Abschnitt 10) ist fertiggestellt. Der Projektinhaber hat entschieden, dass ab jetzt an der Nicht-Ziele-Liste (2.2) weitergearbeitet werden darf — nicht als Freibrief für alle Punkte auf einmal, sondern nach demselben Muster wie bei Multi-Provider (2.4): **pro Feature eine explizite, hier dokumentierte Freigabe**, bevor ein Agent damit anfängt. Ohne Eintrag hier bleibt ein Nicht-Ziel gesperrt.
-
-**Freigabe 1 — License-Compliance, Scope „Lizenz-Erkennung pro Paket":**
-
-- Für jedes Paket aus dem OSV-`--all-packages`-Inventar (5.2) wird zusätzlich zum Registry-Lookup aus 5.3 die deklarierte Lizenz abgefragt (npm: `license`-Feld aus der Registry-Antwort, Packagist: `composer.json`-Metadaten, PyPI: Klassifiers/Metadata, crates.io: `license`-Feld der API) und wie die Versions-Daten 24h gecacht.
-- Neues Feld `packages.license` (Rohwert, z. B. SPDX-Ausdruck oder `unknown`, wenn die Registry nichts liefert oder der Ausdruck nicht geparst werden kann — nicht raten).
-- Anzeige in der Dependencies-Tabelle (8.2) als zusätzliche Spalte, kein eigener Severity-artiger Zustand.
-- **Ausdrücklich nicht Teil dieser Freigabe** (bleiben eigene, künftig einzeln zu entscheidende Nicht-Ziele): Allow-/Denylist-Policy, automatische Copyleft/Permissive-Klassifizierung samt Warn-UI, SBOM-Export (weiterhin Phase 6, siehe 2.3).
-
-### 2.6 Mehrbenutzerbetrieb, Rollen (freigegeben, 2026-09-18)
-
-Ursprünglich Teil von 2.2, auf Wunsch des Projektinhabers freigegeben — bewusst mit reduziertem Scope, kein echtes Team-Konzept:
-
-- **Mehrere benannte Nutzer-Accounts** auf derselben Instanz statt genau einem Admin. Kein Self-Signup: neue Nutzer werden ausschließlich von einem `admin` in den Settings angelegt (Username + initiales Passwort), analog zum bisherigen Setup-Wizard-Flow, aber ohne dessen einmalige Sperre — die Sperre gilt weiterhin nur für den allerersten Account.
-- **Zwei Rollen: `admin`, `member`.** `admin` darf zusätzlich zu allem, was `member` darf: Git-Accounts verbinden/reconnecten/löschen, Nutzer anlegen/deaktivieren/Rolle ändern. `member` darf: Projekte importieren/ansehen/löschen, Scans auslösen/ansehen, Findings einsehen/suppressen, Projekt-Settings ändern, Notification-/Schedule-Settings ändern — alles außer Git-Account- und Nutzerverwaltung.
-- **Kein Team-Konzept.** Alle Nutzer teilen sich eine Instanz und sehen dieselben Projekte und Git-Accounts — keine Team-Tabelle, keine projektbezogene Zugriffs-Isolation. „Teams" im Sinne von getrennten Arbeitsbereichen bleibt Nicht-Ziel.
-- **Git-Accounts bleiben instanzweit geteilt**, nicht user-gebunden — unverändert zu 2.4, nur die Verwaltung wird auf `admin` beschränkt.
-- Threat Model (6.1) wird entsprechend präzisiert: die Trust-Boundary zwischen Worker und fremdem Repo-Inhalt ändert sich nicht; es gibt weiterhin keine Multi-Tenant-Isolation zu bauen, nur mehrere vertrauenswürdige Nutzer _einer_ Organisation statt eines einzelnen.
-- **Ausdrücklich nicht Teil dieser Freigabe:** echte Teams/Projekt-Gruppen, feingranulare Permissions über die zwei Rollen hinaus, Invite-per-E-Mail (Nutzer werden synchron vom Admin angelegt, kein Mail-Versand), Audit-Log (bleibt 6.3).
+- PostgreSQL (SQLite reicht weiterhin; die Abstraktion erlaubt den späteren Wechsel)
+- SBOM-Export (CycloneDX)
+- Echte Teams/Projekt-Gruppen, feingranulare Permissions über `admin`/`member` hinaus, Invite-per-E-Mail
+- Incoming Webhooks / Event-getriebene Scan-Trigger, Tunneling
+- EPSS- und CISA-KEV-Anreicherung zur Priorisierung
+- Sustainability-/Dead-Project-Score
+- KI-Layer: Triage-Assistent, Reachability-Einschätzung, Upgrade-Assistent — Leitplanken gelten bereits verbindlich, siehe Abschnitt 9
+- Audit-Log, Checksum-Verifikation der Scanner-Binaries — bewusst zurückgestellt, siehe 6.3
 
 ---
 
@@ -215,7 +175,7 @@ Client-seitiges Polling würde bedeuten: jeder offene Browser-Tab fragt eigenst�
 ```
 users
   id, username, password_hash, role ('admin'|'member'), created_at, last_login_at
-  -- mehrere Accounts, keine Team-Zuordnung (2.6): admin verwaltet Git-Accounts
+  -- mehrere Accounts, keine Team-Zuordnung (2.2): admin verwaltet Git-Accounts
   -- und Nutzer, member alles andere
 
 settings
@@ -225,7 +185,7 @@ git_accounts
   id, provider ('github'|'gitlab'), base_url (null = provider's public SaaS),
   username, token_encrypted, token_scopes, status ('valid'|'invalid'),
   connected_at, last_validated_at
-  -- mehrere Accounts gleichzeitig, auch mehrere desselben Providers (2.4)
+  -- mehrere Accounts gleichzeitig, auch mehrere desselben Providers (2.2)
 
 projects
   id, git_account_id, provider_repo_id, name, full_name,
@@ -381,11 +341,11 @@ Weitere zu behandelnde Fälle: Clone-Fehler (Token abgelaufen, Repo gelöscht, R
 
 ### 6.1 Threat Model
 
-**Was kein Thema ist:** Jede Instanz läuft auf dem eigenen Server des Nutzers, mehrere Nutzer-Accounts einer Organisation statt eines einzelnen (2.6), Import nur von Repos, auf die ein verbundener Git-Account Zugriff hat. Es gibt keine Multi-Tenant-Isolation zu bauen — die Nutzer einer Instanz vertrauen sich gegenseitig (zwei Rollen, `admin`/`member`, regeln nur Git-Account- und Nutzerverwaltung, keine Datentrennung), und ein Nutzer einer Instanz kann über dieses Tool nicht den Server einer anderen Instanz angreifen, weil es keine geteilte Infrastruktur gibt.
+**Was kein Thema ist:** Jede Instanz läuft auf dem eigenen Server des Nutzers, mehrere Nutzer-Accounts einer Organisation statt eines einzelnen (2.2), Import nur von Repos, auf die ein verbundener Git-Account Zugriff hat. Es gibt keine Multi-Tenant-Isolation zu bauen — die Nutzer einer Instanz vertrauen sich gegenseitig (zwei Rollen, `admin`/`member`, regeln nur Git-Account- und Nutzerverwaltung, keine Datentrennung), und ein Nutzer einer Instanz kann über dieses Tool nicht den Server einer anderen Instanz angreifen, weil es keine geteilte Infrastruktur gibt.
 
 **Was sehr wohl ein Thema ist:** „eigenes Repo" heißt nicht „nur eigener Code". Jedes gescannte Repository zieht über seine Lockfiles hunderte fremde Dependencies, und dessen Git-Historie kann Inhalte von Kollegen, Pull Requests oder Forks enthalten. Kompromittierte npm- oder Packagist-Pakete sind real vorgekommen (`event-stream`, `ua-parser-js`, u. a.), und es gab reale CVEs, bei denen ein präpariertes Repo beim reinen `git clone` Code auf dem klonenden Rechner ausführen konnte.
 
-Die eigentliche Trust-Boundary liegt deshalb nicht zwischen Nutzern, sondern zwischen dem **Worker-Prozess** (der fremden, nicht vertrauenswürdigen Repo-Inhalt verarbeitet) und allem, was dieser Prozess erreichen kann — allen voran der GitHub-Token, der typischerweise Lesezugriff auf _alle_ Repos des Nutzers hat, nicht nur das gerade gescannte. Jede Härtungsmaßnahme in diesem Abschnitt zielt darauf, diesen Blast Radius zu begrenzen, falls kompromittierter Repo-Inhalt den Worker einmal dazu bringt, sich anders zu verhalten als erwartet.
+Die eigentliche Trust-Boundary liegt deshalb nicht zwischen Nutzern, sondern zwischen dem **Worker-Prozess** (der fremden, nicht vertrauenswürdigen Repo-Inhalt verarbeitet) und allem, was dieser Prozess erreichen kann — allen voran der Git-Provider-Token, der typischerweise Lesezugriff auf _alle_ Repos des Nutzers hat, nicht nur das gerade gescannte. Jede Härtungsmaßnahme in diesem Abschnitt zielt darauf, diesen Blast Radius zu begrenzen, falls kompromittierter Repo-Inhalt den Worker einmal dazu bringt, sich anders zu verhalten als erwartet.
 
 ### 6.2 Maßnahmen
 
@@ -404,7 +364,7 @@ Die eigentliche Trust-Boundary liegt deshalb nicht zwischen Nutzern, sondern zwi
 
 ### 6.3 Bewusst zurückgestellt
 
-Ein Audit-Log („wer hat wann was gemacht") wäre bei Mehrbenutzerbetrieb Pflicht, bringt bei einem Single-Admin-Tool aber wenig im Verhältnis zum Aufwand — das gehört eher zu Phase 3, wenn Notifications ohnehin dazukommen. Checksum-Verifikation der heruntergeladenen Scanner-Binaries ist thematisch passend, aber kein Sicherheitsgewinn, der die zusätzliche Komplexität für das MVP rechtfertigt.
+Ein Audit-Log („wer hat wann was gemacht") wäre bei Mehrbenutzerbetrieb (2.2) sinnvoll, bringt aber weiterhin wenig im Verhältnis zum Aufwand — bleibt Backlog (2.2), keiner festen Phase mehr zugeordnet. Checksum-Verifikation der heruntergeladenen Scanner-Binaries ist thematisch passend, aber weiterhin kein Sicherheitsgewinn, der die zusätzliche Komplexität rechtfertigt.
 
 ---
 
@@ -415,7 +375,7 @@ Der Setup-Wizard beim ersten Aufruf ist auf das Nötigste reduziert:
 1. **Create admin account** — Username, Passwort, Passwortbestätigung.
 2. **Connect GitHub** — PAT eingeben, Validierung gegen `/user`, Anzeige des erkannten Accounts und der Scopes.
 
-Der erste angelegte Account bekommt automatisch die Rolle `admin`. Weitere Nutzer (2.6) werden nicht über den Wizard angelegt, sondern von einem `admin` unter Settings → Users (Username + initiales Passwort, Rolle `admin` oder `member`).
+Der erste angelegte Account bekommt automatisch die Rolle `admin`. Weitere Nutzer (2.2) werden nicht über den Wizard angelegt, sondern von einem `admin` unter Settings → Users (Username + initiales Passwort, Rolle `admin` oder `member`).
 
 Alles andere (Notifications, KI, weitere Provider) wandert in die Settings und ist optional. Ein Setup-Wizard mit sieben Abschnitten führt dazu, dass Leute das Tool wieder löschen, bevor sie es gesehen haben.
 
@@ -490,7 +450,7 @@ Query-Keys folgen der Ressourcen-Hierarchie: `['projects']` für die Grid-Ansich
 
 ---
 
-## 9. KI-Layer (Phase 5) — Vorbereitung und Leitplanken
+## 9. KI-Layer — Vorbereitung und Leitplanken
 
 Die KI-Features bleiben Teil der Produktvision. Sie werden nicht im MVP gebaut, aber die Architektur darf sie nicht verbauen. Konkret heißt das für Phase 1–2: Findings werden mit genug Kontext gespeichert (Dateipfad, Paketname, betroffene Version, Fixed-Version), dass ein späterer KI-Aufruf daraus einen Prompt bauen kann, ohne erneut klonen zu müssen.
 

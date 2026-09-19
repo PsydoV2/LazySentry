@@ -4,7 +4,7 @@ Diese Datei gilt für jeden Agent-Lauf in diesem Repo. Sie ist bewusst kurz — 
 
 ## Projekt in einem Satz
 
-Selbstgehostetes Security- & Maintenance-Dashboard: Dependency/CVE-Tracking, Version Auditing, Secret Detection (TruffleHog) für GitHub-Repos, ein Docker-Container, ein Admin.
+Selbstgehostetes Security- & Maintenance-Dashboard: Dependency/CVE-Tracking, Version Auditing, Secret Detection (TruffleHog) für GitHub-/GitLab-Repos, ein Docker-Container, mehrere Nutzer möglich.
 
 ## Stack
 
@@ -18,7 +18,7 @@ Diese Regeln gelten unabhängig vom aktuellen Task und werden nicht "aus Zeitgr�
 2. **Exit-Codes sind semantisch, kein Fehler-Indikator im üblichen Sinn.** `osv-scanner` Code 1 = Vulnerabilities gefunden = Erfolg. `trufflehog` Code 183 = verifizierte Credentials gefunden = Erfolg. `osv-scanner` Code 128 = keine Lockfiles = eigener Zustand, nicht "sauber". Siehe 5.6.
 3. **Subprozesse: immer `spawn` mit Argument-Array, nie `shell: true`, nie Token in der Kommandozeile.** Clone-Token über `GIT_ASKPASS`/Credential-Helper, nicht in der URL — Prozessargumente sind für jeden mit Host-Zugriff sichtbar.
 4. **Temporäre Scan-Verzeichnisse werden im `finally`-Block gelöscht**, zusätzlich räumt der Worker beim Start verwaiste `/tmp/scan-*` auf. Kein Cleanup nur im Erfolgsfall.
-5. **Kein Feature aus dem Nicht-Ziele-Abschnitt (`docs/CONCEPT.md` 2.2) anfangen, auch nicht "schon mal vorbereiten".** Multi-Provider, Webhooks, KI, License-Compliance, Mehrbenutzerbetrieb — alles bewusst später. Provider-Interface darf abstrahiert sein, aber nur GitHub wird implementiert.
+5. **Nicht-Ziele in `docs/CONCEPT.md` 2.2 nicht anfangen, auch nicht "schon mal vorbereiten", solange sie dort nicht als umgesetzt stehen.** Multi-Provider, Mehrbenutzerbetrieb, Notifications, Cron-Scheduling, Suppression und License-Anzeige sind inzwischen umgesetzt — daran normal weiterbauen. Weiterhin nicht anfangen: KI-Features, SBOM-Export, PostgreSQL, incoming Webhooks/Event-getriebene Scans, EPSS/CISA-KEV, Sustainability-Score, echte Teams. Aktueller Stand: `docs/CONCEPT.md` 2.2.
 6. **Worker-Container läuft als Non-Root mit `cap_drop: [ALL]`.** Der Worker verarbeitet nicht vertrauenswürdigen Repo-Inhalt (fremde Dependencies, fremde Git-Historie) — siehe Threat Model in 6.1.
 7. **Nie `dangerouslySetInnerHTML` auf Feldern, die aus Scan-Ergebnissen stammen** (Dateipfade, Commit-Messages, Paketnamen, Autorennamen). Diese Daten kommen aus fremdem Repo-Inhalt und sind nicht vertrauenswürdig.
 8. **Findings werden pro Projekt eindeutig gehalten** (`UNIQUE(project_id, fingerprint)`), nicht pro Scan neu angelegt. Reconciliation-Logik (Upsert + Resolved-Markierung) siehe 4.1 — nicht selbst neu erfinden.
