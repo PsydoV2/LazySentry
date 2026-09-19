@@ -22,7 +22,10 @@ export function Login({ onSignedIn }: { onSignedIn: () => void }) {
   }
 
   return (
-    <div className="centered-page">
+    <div className="login-page">
+      <img src="/wordmark-light.svg" alt="LazySentry" className="login-wordmark login-wordmark-light" />
+      <img src="/wordmark-dark.svg" alt="LazySentry" className="login-wordmark login-wordmark-dark" />
+
       <form className="panel card stack" onSubmit={handleSubmit}>
         <h1>Sign in</h1>
 

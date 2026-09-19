@@ -292,6 +292,47 @@ a:hover {
   max-width: 440px;
 }
 
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-6);
+  padding: var(--space-5);
+}
+
+/* Login wordmark: light and dark SVGs both render, CSS picks the right one
+   for the active theme (same :root[data-theme] / prefers-color-scheme
+   pattern as the color tokens above), so there's no flash-of-wrong-logo on
+   load the way a JS-computed src would have. */
+.login-wordmark {
+  height: 64px;
+  width: auto;
+}
+
+.login-wordmark-dark {
+  display: none;
+}
+
+:root[data-theme="dark"] .login-wordmark-light {
+  display: none;
+}
+
+:root[data-theme="dark"] .login-wordmark-dark {
+  display: block;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .login-wordmark-light {
+    display: none;
+  }
+
+  :root:not([data-theme="light"]) .login-wordmark-dark {
+    display: block;
+  }
+}
+
 .divider {
   height: 1px;
   background: var(--border);
