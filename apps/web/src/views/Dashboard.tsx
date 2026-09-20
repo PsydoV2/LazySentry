@@ -9,7 +9,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Project, ProjectSection } from '@lazysentry/shared';
 import { AddSectionRow } from '../components/AddSectionRow';
-import { DashboardGroup } from '../components/DashboardGroup';
+import { DashboardGroup, maxSectionWidth } from '../components/DashboardGroup';
 import { ImportDialog } from '../components/ImportDialog';
 import { ProjectCard } from '../components/ProjectCard';
 import { SectionHeader } from '../components/SectionHeader';
@@ -19,6 +19,7 @@ import { api } from '../lib/api';
 import { sortByUrgency } from '../lib/card-state';
 import { useDashboardDnd } from '../lib/dashboard-dnd';
 import { groupProjects } from '../lib/dashboard-groups';
+import { useElementWidth } from '../lib/use-element-width';
 import { useScanEvents } from '../lib/events';
 import { relativeTime } from '../lib/format';
 import type { Route } from '../lib/router';
@@ -30,6 +31,8 @@ export function Dashboard({
 }) {
   const queryClient = useQueryClient();
   const [importing, setImporting] = useState(false);
+  const [groupsRef, groupsWidth] = useElementWidth<HTMLDivElement>();
+  const sectionWidth = maxSectionWidth(groupsWidth);
 
   // Scan progress arrives over SSE instead of being polled (3.5).
   useScanEvents();
@@ -159,7 +162,10 @@ export function Dashboard({
     <main className="page stack">
       <UpdateBanner />
 
-      <div className="dashboard-heading">
+      <div
+        className="dashboard-heading"
+        style={sectionWidth ? { width: sectionWidth, margin: '0 auto' } : undefined}
+      >
         <div>
           <h1>Projects</h1>
           <span className="subtle">
@@ -192,11 +198,12 @@ export function Dashboard({
       )}
 
       {!isLoading && allProjects.length > 0 && (
-        <div className="dashboard-groups">
+        <div className="dashboard-groups" ref={groupsRef}>
           {groups.pinned.length > 0 && (
             <DashboardGroup
               groupKey={{ kind: 'pinned' }}
               projects={groups.pinned}
+              sectionWidth={sectionWidth}
               dnd={dnd}
               renderCard={renderCard}
               header={
@@ -213,6 +220,7 @@ export function Dashboard({
               key={section.id}
               groupKey={{ kind: 'section', sectionId: section.id }}
               projects={section.collapsed ? [] : sectionProjects}
+              sectionWidth={sectionWidth}
               dnd={dnd}
               renderCard={renderCard}
               header={
@@ -231,11 +239,17 @@ export function Dashboard({
             />
           ))}
 
-          <AddSectionRow onCreate={(name) => createSection.mutate(name)} />
+          <div
+            className="dashboard-group"
+            style={sectionWidth ? { width: sectionWidth } : undefined}
+          >
+            <AddSectionRow onCreate={(name) => createSection.mutate(name)} />
+          </div>
 
           <DashboardGroup
             groupKey={{ kind: 'rest' }}
             projects={groups.rest}
+            sectionWidth={sectionWidth}
             dnd={dnd}
             renderCard={renderCard}
             header={

@@ -8,9 +8,33 @@ import type { Project } from '@lazysentry/shared';
 import type { DashboardGroupKey } from '../lib/dashboard-groups';
 import type { DashboardDnd } from '../lib/dashboard-dnd';
 
+// Must match .project-grid's grid-template-columns (minmax(320px, 420px))
+// and the gap variable (--space-4) in styles.css.
+const CARD_MAX_WIDTH = 420;
+const GRID_GAP = 16;
+
+/**
+ * The one section width every group shares, driven only by how many
+ * fixed-420px cards fit side by side in the space actually available (docs:
+ * see useElementWidth) — not by how many cards any particular section
+ * holds. A section with fewer cards than that is still this width, with its
+ * cards left-aligned inside it, so every section's left/right edge lines up
+ * with every other. The width only ever steps up once there's room for one
+ * more full column, and steps back down the same way, never in between.
+ */
+export function maxSectionWidth(availableWidth: number): number | undefined {
+  if (availableWidth <= 0) return undefined;
+  const columns = Math.max(
+    1,
+    Math.floor((availableWidth + GRID_GAP) / (CARD_MAX_WIDTH + GRID_GAP)),
+  );
+  return columns * CARD_MAX_WIDTH + (columns - 1) * GRID_GAP;
+}
+
 export function DashboardGroup({
   groupKey,
   projects,
+  sectionWidth,
   dnd,
   renderCard,
   header,
@@ -18,6 +42,8 @@ export function DashboardGroup({
 }: {
   groupKey: DashboardGroupKey;
   projects: Project[];
+  /** Shared width for every section on the dashboard — see maxSectionWidth. */
+  sectionWidth: number | undefined;
   dnd: DashboardDnd;
   renderCard: (project: Project) => ReactNode;
   header?: ReactNode;
@@ -28,7 +54,7 @@ export function DashboardGroup({
   const appendTarget = dnd.isProjectAppendTarget(groupKey);
 
   return (
-    <div className="dashboard-group">
+    <div className="dashboard-group" style={sectionWidth ? { width: sectionWidth } : undefined}>
       {header}
 
       {projects.length > 0 ? (

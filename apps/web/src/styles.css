@@ -996,6 +996,19 @@ button:disabled {
 .dashboard-groups {
   display: flex;
   flex-direction: column;
+  /* Every .dashboard-group is given the same explicit width in px
+     (maxSectionWidth in DashboardGroup.tsx, fed by useElementWidth) — the
+     widest row of fixed 420px cards that fits the space actually
+     available, the same for every section regardless of how many cards
+     that particular section holds. So centering it here gets real,
+     symmetric space on both sides, and every section's left/right edge
+     lines up with every other's. CSS alone can't compute that width: a
+     shrink-wrapped (fit-content) box's intrinsic size for an auto-fit grid
+     collapses to a single column no matter how much room is available
+     (verified empirically — max-width can only ever cap that 1-column
+     result down, never grow it back up), so there's no pure-CSS way to say
+     "as wide as however many columns actually fit." */
+  align-items: center;
   gap: var(--space-6);
 }
 
@@ -1027,7 +1040,21 @@ button:disabled {
 
 .project-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 420px));
+  /* auto-fit (not auto-fill): the column count is still decided by how many
+     320px-min cards fit, but an empty track collapses to 0 instead of
+     reserving a phantom card-width slot, so a short row's real cards can
+     grow to fill the freed space and the block centers on its actual
+     content rather than on a reserved-but-unused column. Existing columns
+     stretch toward the 420px cap before a new column is ever added — the
+     column count only increases once there is room for another full
+     320px-min column, never for a partial one. .dashboard-group above is
+     already set to exactly that many columns' width (whether or not this
+     particular section has that many cards) and centers that box as a
+     unit, so the cards themselves stay start-aligned within it — a second
+     centering here would just be redundant, and would misalign both a
+     section with fewer cards than fit a row and a wrapped last row
+     (start-aligned, matching normal grid flow). */
+  grid-template-columns: repeat(auto-fit, minmax(320px, 420px));
   justify-content: start;
   gap: var(--space-4);
   border-radius: var(--radius-lg);
@@ -1153,6 +1180,7 @@ button:disabled {
 .add-section-form {
   display: flex;
   align-items: center;
+  align-self: flex-start;
   gap: var(--space-2);
 }
 
