@@ -27,12 +27,23 @@ const SCOPE_HINTS: Record<GitProviderId, { url: string; label: string; scopes: s
     label: 'personal access token',
     scopes: 'read_api and read_repository',
   },
+  gitea: {
+    url: '', // Self-hosted, no fixed URL — see the instance-URL hint instead.
+    label: 'access token',
+    scopes: 'read:repository',
+  },
+};
+
+const TOKEN_PLACEHOLDER: Record<GitProviderId, string> = {
+  github: 'github_pat_…',
+  gitlab: 'glpat-…',
+  gitea: '',
 };
 
 /**
- * Personal access token form for GitHub or GitLab. Several accounts can be
- * connected side by side, including several for the same provider — this
- * form always creates a new connection rather than replacing one.
+ * Personal access token form for GitHub, GitLab or Gitea. Several accounts
+ * can be connected side by side, including several for the same provider —
+ * this form always creates a new connection rather than replacing one.
  */
 export function ConnectGitAccount({ onConnected, submitLabel = 'Connect', fixedProvider }: Props) {
   const providers = useQuery({
@@ -96,10 +107,14 @@ export function ConnectGitAccount({ onConnected, submitLabel = 'Connect', fixedP
             id="base-url"
             type="text"
             value={baseUrl}
-            placeholder={info.defaultBaseUrl}
+            placeholder={info.baseUrlRequired ? 'https://gitea.example.com' : info.defaultBaseUrl}
             onChange={(event) => setBaseUrl(event.target.value)}
           />
-          <p className="field-hint">Leave empty for {info.defaultBaseUrl}.</p>
+          <p className="field-hint">
+            {info.baseUrlRequired
+              ? 'Required — the URL of your self-hosted instance.'
+              : `Leave empty for ${info.defaultBaseUrl}.`}
+          </p>
         </div>
       )}
 
@@ -110,14 +125,18 @@ export function ConnectGitAccount({ onConnected, submitLabel = 'Connect', fixedP
           type="password"
           value={token}
           autoComplete="off"
-          placeholder={provider === 'github' ? 'github_pat_…' : 'glpat-…'}
+          placeholder={TOKEN_PLACEHOLDER[provider]}
           onChange={(event) => setToken(event.target.value)}
         />
         <p className="field-hint">
           Use a{' '}
-          <a href={hint.url} target="_blank" rel="noreferrer noopener">
-            {hint.label}
-          </a>{' '}
+          {hint.url ? (
+            <a href={hint.url} target="_blank" rel="noreferrer noopener">
+              {hint.label}
+            </a>
+          ) : (
+            hint.label
+          )}{' '}
           with only <strong>{hint.scopes}</strong>. The token is encrypted before
           it is stored and never leaves this server.
         </p>
@@ -129,7 +148,9 @@ export function ConnectGitAccount({ onConnected, submitLabel = 'Connect', fixedP
         <button
           type="submit"
           className="btn-primary"
-          disabled={busy || token.trim() === ''}
+          disabled={
+            busy || token.trim() === '' || (info?.baseUrlRequired && baseUrl.trim() === '')
+          }
         >
           {busy ? 'Checking…' : submitLabel}
         </button>

@@ -10,6 +10,7 @@ import { LoadingState } from './LoadingState';
 import {
   IconChevronLeft,
   IconChevronRight,
+  IconGitea,
   IconGithub,
   IconGitlab,
   IconLock,
@@ -18,6 +19,18 @@ import {
 } from './icons';
 import { api, ApiError, type GitAccountsList, type RepositoryPage } from '../lib/api';
 import type { Route } from '../lib/router';
+
+const PROVIDER_ICON: Record<string, typeof IconGithub> = {
+  github: IconGithub,
+  gitlab: IconGitlab,
+  gitea: IconGitea,
+};
+
+const PROVIDER_LABEL: Record<string, string> = {
+  github: 'GitHub',
+  gitlab: 'GitLab',
+  gitea: 'Gitea',
+};
 
 // GitHub's usual per-language marker colors — decorative only, matches the
 // convention repo lists elsewhere use so a language is recognizable at a
@@ -123,12 +136,15 @@ export function ImportDialog({
                   onClick={() => switchAccount(account.id)}
                 >
                   <span className="account-avatar" aria-hidden="true">
-                    {account.provider === 'gitlab' ? <IconGitlab /> : <IconGithub />}
+                    {(() => {
+                      const Icon = PROVIDER_ICON[account.provider] ?? IconGithub;
+                      return <Icon />;
+                    })()}
                   </span>
                   <span style={{ minWidth: 0 }}>
                     <div className="account-name">{account.username}</div>
                     <div className="account-provider">
-                      {account.provider === 'gitlab' ? 'GitLab' : 'GitHub'}
+                      {PROVIDER_LABEL[account.provider] ?? account.provider}
                     </div>
                   </span>
                 </button>

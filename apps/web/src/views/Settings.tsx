@@ -1,5 +1,5 @@
 // Instance settings (docs/CONCEPT.md 6.2 reconnect flow): connected
-// accounts — several at once, across GitHub and GitLab.
+// accounts — several at once, across GitHub, GitLab and Gitea.
 
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -13,6 +13,7 @@ import {
   IconBell,
   IconClock,
   IconDiscord,
+  IconGitea,
   IconGithub,
   IconGitlab,
   IconKey,
@@ -81,8 +82,15 @@ const ROLE_OPTIONS: SelectOption<UserRole>[] = [
   { value: 'admin', label: 'Admin' },
 ];
 
+const PROVIDER_ICON: Record<string, typeof IconGithub> = {
+  github: IconGithub,
+  gitlab: IconGitlab,
+  gitea: IconGitea,
+};
+
 function ProviderIcon({ provider }: { provider: string }) {
-  return provider === 'gitlab' ? <IconGitlab /> : <IconGithub />;
+  const Icon = PROVIDER_ICON[provider] ?? IconGithub;
+  return <Icon />;
 }
 
 function NotificationPlatformIcon({ platform }: { platform: string }) {

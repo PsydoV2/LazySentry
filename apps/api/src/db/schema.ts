@@ -34,10 +34,11 @@ export const settings = sqliteTable('settings', {
 
 export const gitAccounts = sqliteTable('git_accounts', {
   id: integer('id').primaryKey({ autoIncrement: true }),
-  provider: text('provider').notNull(), // 'github' | 'gitlab'
+  provider: text('provider').notNull(), // 'github' | 'gitlab' | 'gitea'
   // Null means the provider's public SaaS instance (github.com / gitlab.com);
-  // set for a self-hosted GitLab instance. Multiple accounts — including
-  // several for the same provider — are supported side by side.
+  // set for a self-hosted GitLab instance, and always set for Gitea (no
+  // public SaaS default exists). Multiple accounts — including several for
+  // the same provider — are supported side by side.
   baseUrl: text('base_url'),
   username: text('username').notNull(),
   tokenEncrypted: text('token_encrypted').notNull(),

@@ -1,5 +1,5 @@
-// Connecting git accounts (GitHub and GitLab, several at once) and importing
-// repositories from them (docs/CONCEPT.md 7, 8.1).
+// Connecting git accounts (GitHub, GitLab and Gitea, several at once) and
+// importing repositories from them (docs/CONCEPT.md 7, 8.1).
 
 import type { FastifyInstance } from 'fastify';
 import { inArray } from 'drizzle-orm';
@@ -28,7 +28,7 @@ import { ProviderAuthError, ProviderRequestError } from '../providers/types.js';
 import { adminAccountExists } from '../auth/users.js';
 
 const connectSchema = z.object({
-  provider: z.enum(['github', 'gitlab']),
+  provider: z.enum(['github', 'gitlab', 'gitea']),
   token: z.string().trim().min(1, 'Token must not be empty'),
   baseUrl: z.string().trim().url().optional(),
 });
@@ -93,6 +93,7 @@ export function registerGitAccountRoutes(app: FastifyInstance): void {
       label: p.label,
       supportsCustomBaseUrl: p.supportsCustomBaseUrl,
       defaultBaseUrl: p.defaultBaseUrl,
+      baseUrlRequired: p.baseUrlRequired,
     })),
   }));
 
@@ -106,6 +107,9 @@ export function registerGitAccountRoutes(app: FastifyInstance): void {
 
       if (input.baseUrl && !provider.supportsCustomBaseUrl) {
         throw badRequest(`${provider.label} does not support a custom base URL`);
+      }
+      if (!input.baseUrl && provider.baseUrlRequired) {
+        throw badRequest(`${provider.label} requires a base URL`);
       }
       const baseUrl = provider.supportsCustomBaseUrl ? normalizeBaseUrl(input.baseUrl) : null;
 

@@ -143,7 +143,7 @@ export interface UpdateUserRoleInput {
 
 /** Provider ids implemented today; the interface behind them stays abstract
  * so a future one is a new file, not a rewrite (docs/CONCEPT.md 2.2). */
-export type GitProviderId = 'github' | 'gitlab';
+export type GitProviderId = 'github' | 'gitlab' | 'gitea';
 
 /** GET /api/providers — what the connect form can offer. */
 export interface ProviderInfo {
@@ -151,6 +151,8 @@ export interface ProviderInfo {
   label: string;
   supportsCustomBaseUrl: boolean;
   defaultBaseUrl: string;
+  /** True when there is no public SaaS default (Gitea) — the connect form must require it. */
+  baseUrlRequired: boolean;
 }
 
 export interface ProvidersList {

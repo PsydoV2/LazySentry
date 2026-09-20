@@ -1,6 +1,6 @@
-// Provider abstraction. GitHub and GitLab are implemented — the interface
-// is what lets a new provider (Bitbucket, Gitea, …) be a new file instead of
-// a rewrite of everything that talks to "the" git account.
+// Provider abstraction. GitHub, GitLab and Gitea are implemented — the
+// interface is what lets a new provider (Bitbucket, …) be a new file instead
+// of a rewrite of everything that talks to "the" git account.
 
 export interface ProviderAccount {
   username: string;
@@ -33,17 +33,29 @@ export interface RepositoryPage {
   totalPages?: number;
 }
 
-export type ProviderId = 'github' | 'gitlab';
+export type ProviderId = 'github' | 'gitlab' | 'gitea';
 
 export interface GitProvider {
   readonly id: ProviderId;
   readonly label: string;
   /** Whether this provider can point at a self-hosted instance. */
   readonly supportsCustomBaseUrl: boolean;
+  /**
+   * True when there is no public SaaS default to fall back to (Gitea is
+   * always self-hosted, unlike github.com/gitlab.com) — the connect form
+   * must require a base URL instead of treating it as optional.
+   */
+  readonly baseUrlRequired: boolean;
   /** Used when the account did not specify a base URL. */
   readonly defaultBaseUrl: string;
-  /** HTTP Basic auth username to pair with the token when cloning (0.3, 6.2). */
-  readonly cloneAuthUsername: string;
+  /**
+   * HTTP Basic auth credentials to pair with the clone token (0.3, 6.2).
+   * Most providers put a fixed placeholder in the username and the token in
+   * the password (GitHub: x-access-token, GitLab: oauth2); Gitea inverts
+   * this — token as username, fixed `x-oauth-basic` as password — so this
+   * returns the full pair rather than a single constant.
+   */
+  cloneAuth(token: string): { username: string; password: string };
   validateToken(token: string, baseUrl?: string): Promise<ProviderAccount>;
   listRepositories(
     token: string,

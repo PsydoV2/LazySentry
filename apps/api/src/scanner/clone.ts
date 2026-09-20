@@ -40,8 +40,7 @@ export function newScanDir(): string {
  */
 export function cloneEnv(
   cloneUrl: string,
-  token: string | undefined,
-  authUsername: string,
+  auth: { username: string; password: string } | undefined,
 ): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
@@ -50,10 +49,10 @@ export function cloneEnv(
     GIT_TERMINAL_PROMPT: '0',
     GIT_ASKPASS: '',
   };
-  if (token === undefined) return env;
+  if (auth === undefined) return env;
 
   const origin = new URL(cloneUrl).origin;
-  const basic = Buffer.from(`${authUsername}:${token}`).toString('base64');
+  const basic = Buffer.from(`${auth.username}:${auth.password}`).toString('base64');
   env.GIT_CONFIG_COUNT = '1';
   env.GIT_CONFIG_KEY_0 = `http.${origin}/.extraheader`;
   env.GIT_CONFIG_VALUE_0 = `Authorization: Basic ${basic}`;
@@ -70,14 +69,13 @@ function isAuthFailure(stderr: string): boolean {
 export async function cloneRepository(
   cloneUrl: string,
   targetDir: string,
-  token?: string,
+  auth?: { username: string; password: string },
   signal?: AbortSignal,
-  authUsername = 'x-access-token',
 ): Promise<{ commitSha: string; lastCommitAt: Date | null }> {
   const clone = await execute(
     'git',
     ['clone', '--quiet', '--', cloneUrl, targetDir],
-    { timeoutMs: CLONE_TIMEOUT_MS, env: cloneEnv(cloneUrl, token, authUsername), signal },
+    { timeoutMs: CLONE_TIMEOUT_MS, env: cloneEnv(cloneUrl, auth), signal },
   );
   if (clone.cancelled) {
     throw new CloneError('git clone cancelled', false, true);

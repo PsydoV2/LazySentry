@@ -2,6 +2,7 @@
 // consumer that needs "the provider for this account" goes through here
 // instead of branching on `provider === 'github'` itself.
 
+import { giteaProvider } from './gitea.js';
 import { githubProvider } from './github.js';
 import { gitlabProvider } from './gitlab.js';
 import type { GitProvider, ProviderId } from './types.js';
@@ -9,6 +10,7 @@ import type { GitProvider, ProviderId } from './types.js';
 const PROVIDERS: Record<ProviderId, GitProvider> = {
   github: githubProvider,
   gitlab: gitlabProvider,
+  gitea: giteaProvider,
 };
 
 export const PROVIDER_LIST = Object.values(PROVIDERS);

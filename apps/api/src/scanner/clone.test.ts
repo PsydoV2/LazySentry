@@ -7,7 +7,7 @@ import { execute } from './exec.js';
 
 describe('cloneEnv', () => {
   it('adds no credentials for an anonymous (public, no-token) clone', () => {
-    const env = cloneEnv('https://github.com/acme/demo.git', undefined, 'x-access-token');
+    const env = cloneEnv('https://github.com/acme/demo.git', undefined);
     expect(env.GIT_CONFIG_COUNT).toBeUndefined();
     expect(env.GIT_TERMINAL_PROMPT).toBe('0');
   });
@@ -17,11 +17,10 @@ describe('cloneEnv', () => {
     // token belongs to (docs/CONCEPT.md 6.2) — and now that repositories can
     // come from more than one provider, that host is no longer always
     // github.com.
-    const env = cloneEnv(
-      'https://gitlab.example.com/group/project.git',
-      'secret-token',
-      'oauth2',
-    );
+    const env = cloneEnv('https://gitlab.example.com/group/project.git', {
+      username: 'oauth2',
+      password: 'secret-token',
+    });
     expect(env.GIT_CONFIG_KEY_0).toBe('http.https://gitlab.example.com/.extraheader');
 
     const basic = Buffer.from('oauth2:secret-token').toString('base64');
@@ -29,20 +28,38 @@ describe('cloneEnv', () => {
   });
 
   it('never puts the raw token anywhere but the base64 header value', () => {
-    const env = cloneEnv('https://github.com/acme/demo.git', 'secret-token', 'x-access-token');
+    const env = cloneEnv('https://github.com/acme/demo.git', {
+      username: 'x-access-token',
+      password: 'secret-token',
+    });
     expect(env.GIT_CONFIG_KEY_0).not.toContain('secret-token');
     expect(JSON.stringify(env)).not.toContain('"secret-token"');
   });
 
-  it('uses the provider-specific basic-auth username', () => {
-    const github = cloneEnv('https://github.com/acme/demo.git', 't', 'x-access-token');
+  it('uses the provider-specific basic-auth credentials', () => {
+    const github = cloneEnv('https://github.com/acme/demo.git', {
+      username: 'x-access-token',
+      password: 't',
+    });
     expect(github.GIT_CONFIG_VALUE_0).toBe(
       `Authorization: Basic ${Buffer.from('x-access-token:t').toString('base64')}`,
     );
 
-    const gitlab = cloneEnv('https://gitlab.com/acme/demo.git', 't', 'oauth2');
+    const gitlab = cloneEnv('https://gitlab.com/acme/demo.git', {
+      username: 'oauth2',
+      password: 't',
+    });
     expect(gitlab.GIT_CONFIG_VALUE_0).toBe(
       `Authorization: Basic ${Buffer.from('oauth2:t').toString('base64')}`,
+    );
+
+    // Gitea inverts the pattern: token as username, fixed password.
+    const gitea = cloneEnv('https://gitea.example.com/acme/demo.git', {
+      username: 't',
+      password: 'x-oauth-basic',
+    });
+    expect(gitea.GIT_CONFIG_VALUE_0).toBe(
+      `Authorization: Basic ${Buffer.from('t:x-oauth-basic').toString('base64')}`,
     );
   });
 });

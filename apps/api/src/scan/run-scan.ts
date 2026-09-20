@@ -97,18 +97,17 @@ export async function runScan(
     const account =
       project.gitAccountId === null ? undefined : getGitAccountById(project.gitAccountId);
     const token = account ? getAccountToken(account) : undefined;
-    const authUsername =
-      account && isProviderId(account.provider)
-        ? getProvider(account.provider).cloneAuthUsername
-        : 'x-access-token';
+    const auth =
+      token !== undefined && account && isProviderId(account.provider)
+        ? getProvider(account.provider).cloneAuth(token)
+        : undefined;
 
     try {
       ({ commitSha, lastCommitAt } = await cloneRepository(
         project.cloneUrl,
         scanDir,
-        token,
+        auth,
         signal,
-        authUsername,
       ));
     } catch (cloneError) {
       if (cloneError instanceof CloneError && cloneError.isCancelled) {

@@ -97,8 +97,9 @@ export const gitlabProvider: GitProvider = {
   id: 'gitlab',
   label: 'GitLab',
   supportsCustomBaseUrl: true,
+  baseUrlRequired: false,
   defaultBaseUrl: DEFAULT_BASE_URL,
-  cloneAuthUsername: 'oauth2',
+  cloneAuth: (token) => ({ username: 'oauth2', password: token }),
 
   async validateToken(token: string, baseUrl?: string): Promise<ProviderAccount> {
     const { body } = await gitlabFetch('/user', token, baseUrl);

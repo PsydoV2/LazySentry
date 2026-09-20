@@ -124,8 +124,9 @@ export const githubProvider: GitProvider = {
   // github.com is supported (docs/CONCEPT.md 2.2 — provider interface stays
   // abstract, but no new provider surface is built speculatively).
   supportsCustomBaseUrl: false,
+  baseUrlRequired: false,
   defaultBaseUrl: 'https://github.com',
-  cloneAuthUsername: 'x-access-token',
+  cloneAuth: (token) => ({ username: 'x-access-token', password: token }),
 
   async validateToken(token: string): Promise<ProviderAccount> {
     const { body, headers } = await githubFetch('/user', token);
