@@ -18,22 +18,13 @@ One `docker compose up -d`, one browser tab — and for every repository you car
 - 🛡️ **Vulnerabilities** — all direct and transitive dependencies checked against the [OSV database](https://osv.dev)
 - 📦 **Outdated packages** — installed vs. latest registry version, classified as patch / minor / major
 - 🔑 **Leaked secrets** — working tree _and_ full git history scanned with [TruffleHog](https://github.com/trufflesecurity/trufflehog), including live verification of found credentials
-
-> **Status: MVP.** Dependency/CVE tracking, version auditing, secret detection, GitHub/GitLab import (several accounts at once) and the dashboard are implemented and covered by tests. Pre-1.0 — expect rough edges, and see the roadmap below for what's intentionally not here yet.
-
-## Screenshots
-
-<p align="center">
-  <img src="docs/screenshots/Dashboard.png" alt="LazySentry dashboard with pinned and grouped projects, each card showing scan status and finding counts" width="800">
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/Settings.png" alt="LazySentry settings dialog with connected Git accounts and notification channels" width="800">
-</p>
+- 🌱 **Project health** — declared package licenses and a commit-activity-based sustainability signal (`active` → `dead`)
+- 🔔 **Notifications & scheduling** — Discord, Slack and generic webhook channels, plus a shared cron window for automatic scans
+- 👥 **Multiple accounts, multiple users** — GitHub, GitLab and Gitea (including self-hosted instances), several accounts side by side; multiple named users per instance with `admin`/`member` roles
+- 📜 **Audit log** — every security-relevant action (logins, account changes, imports, scans) recorded and admin-viewable
 
 ## Contents
 
-- [Screenshots](#screenshots)
 - [Who is this for?](#who-is-this-for)
 - [Design principles](#design-principles)
 - [Architecture](#architecture)
@@ -44,7 +35,6 @@ One `docker compose up -d`, one browser tab — and for every repository you car
   - [Local development](#local-development)
 - [Reading the dashboard](#reading-the-dashboard)
 - [Updating](#updating)
-- [Roadmap](#roadmap)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -119,10 +109,11 @@ This pulls the prebuilt image from GHCR (`ghcr.io/psydov2/lazysentry`) — no
 local build step. Open **`http://127.0.0.1:3111`** — you land in the setup
 wizard (create the admin account, then connect GitHub with a personal
 access token scoped to `Contents: read` + `Metadata: read`). Additional
-accounts — more GitHub accounts, or GitLab (gitlab.com or self-hosted) —
-can be connected afterwards from Settings. Full walkthrough, including
-exactly which token permissions to grant and how to read the dashboard once
-it's populated: **[docs/SETUP.md](docs/SETUP.md)**.
+accounts — more GitHub accounts, GitLab (gitlab.com or self-hosted), or
+Gitea (self-hosted) — can be connected afterwards from Settings, and
+`admin` can add further named users. Full walkthrough, including exactly
+which token permissions to grant and how to read the dashboard once it's
+populated: **[docs/SETUP.md](docs/SETUP.md)**.
 
 `docker-compose.yml` runs two containers on one image and one shared SQLite
 volume — `api` (the dashboard) and `worker` (runs scans), both non-root with
@@ -202,12 +193,6 @@ docker compose up -d
 
 Database migrations run automatically on `api` startup, against the
 existing volume — no manual migration step, no data loss.
-
-## Roadmap
-
-**MVP (done):** dependency & CVE tracking, version auditing, secret detection with verification, GitHub import via personal access token, dashboard with per-project detail view, Docker Compose setup.
-
-**After the MVP:** multi-provider & multi-account support (GitHub + GitLab, several accounts side by side — done) → notifications (Discord first) & scheduled scans → EPSS/CISA-KEV prioritization → AI-assisted triage & upgrade hints → SBOM export.
 
 ## Contributing
 
