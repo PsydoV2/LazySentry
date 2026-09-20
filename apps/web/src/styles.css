@@ -533,6 +533,22 @@ button:disabled {
   background: var(--bg);
 }
 
+/* Bordered so it reads as clickable at a glance, unlike .btn-quiet which
+   looks like plain text until hovered — used for the suppress/unsuppress
+   toggle sitting among static text in a finding row. */
+.btn-suppress {
+  border-color: var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  padding: 4px 10px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.btn-suppress:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--bg);
+}
+
 /* Bold text + icon, no button chrome — for the one action that sits in a
    fixed spot in the page header rather than competing for attention as a
    filled button. */
@@ -627,6 +643,25 @@ button:disabled {
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--border);
+}
+
+/* Flex items default to min-width: auto, so an unbreakable string (a file
+   path, a redacted secret) in the middle content refuses to shrink and
+   pushes the trailing action button past the row's edge, where the list's
+   overflow: hidden clips it. Let the middle content shrink/wrap/truncate
+   instead, and pin the trailing pill/button to their natural size. */
+.list-row > .stack {
+  min-width: 0;
+}
+.list-row .mono {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.list-row > .pill,
+.list-row > .btn-suppress {
+  flex-shrink: 0;
 }
 
 .list-row:last-child {
@@ -1684,6 +1719,16 @@ button:disabled {
   display: flex;
   gap: var(--space-3);
   align-items: flex-start;
+}
+
+/* Same overflow fix as .list-row: let the growing summary/aliases column
+   shrink instead of forcing the row wider than its container. */
+.vuln-detail-row > .stack {
+  min-width: 0;
+}
+.vuln-detail-row > .pill,
+.vuln-detail-row > .btn-suppress {
+  flex-shrink: 0;
 }
 
 /* ---------- settings ---------- */

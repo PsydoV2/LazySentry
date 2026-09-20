@@ -8,13 +8,22 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EmptyState } from './EmptyState';
 import { api, type Project, type Secret } from '../lib/api';
 import { formatDateTime, shortSha } from '../lib/format';
-import { IconCheck, IconFolder, IconKey, IconShieldAlert, IconShieldCheck } from './icons';
+import {
+  IconCheck,
+  IconFilter,
+  IconFilterFilled,
+  IconFolder,
+  IconKey,
+  IconShieldAlert,
+  IconShieldCheck,
+} from './icons';
 
 export function SecretsTab({ project }: { project: Project }) {
   const projectId = project.id;
   const queryClient = useQueryClient();
   const [showResolved, setShowResolved] = useState(false);
   const [showSuppressed, setShowSuppressed] = useState(false);
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
 
   const secrets = useQuery({
     queryKey: ['project', projectId, 'secrets'],
@@ -80,22 +89,38 @@ export function SecretsTab({ project }: { project: Project }) {
       )}
 
       <div className="filter-bar">
-        <label className="row" style={{ gap: 6 }}>
-          <input
-            type="checkbox"
-            checked={showResolved}
-            onChange={(event) => setShowResolved(event.target.checked)}
-          />
-          Show resolved findings
-        </label>
-        <label className="row" style={{ gap: 6 }}>
-          <input
-            type="checkbox"
-            checked={showSuppressed}
-            onChange={(event) => setShowSuppressed(event.target.checked)}
-          />
-          Show suppressed
-        </label>
+        <button
+          type="button"
+          className={`card-icon-btn filter-toggle-btn${
+            showResolved || showSuppressed ? ' has-active-filters' : ''
+          }`}
+          title="More filters"
+          aria-label="Toggle more filters"
+          aria-pressed={moreFiltersOpen}
+          onClick={() => setMoreFiltersOpen((open) => !open)}
+        >
+          {moreFiltersOpen ? <IconFilterFilled /> : <IconFilter />}
+        </button>
+        {moreFiltersOpen && (
+          <>
+            <label className="row" style={{ gap: 6 }}>
+              <input
+                type="checkbox"
+                checked={showResolved}
+                onChange={(event) => setShowResolved(event.target.checked)}
+              />
+              Show resolved findings
+            </label>
+            <label className="row" style={{ gap: 6 }}>
+              <input
+                type="checkbox"
+                checked={showSuppressed}
+                onChange={(event) => setShowSuppressed(event.target.checked)}
+              />
+              Show suppressed
+            </label>
+          </>
+        )}
         <span className="table-summary subtle">
           {openCount} open{verifiedOpenCount > 0 ? ` (${verifiedOpenCount} verified)` : ''}
           {resolvedCount > 0 ? ` · ${resolvedCount} resolved` : ''}
@@ -171,7 +196,7 @@ export function SecretsTab({ project }: { project: Project }) {
 
                 <button
                   type="button"
-                  className="btn-quiet"
+                  className="btn-suppress"
                   disabled={suppress.isPending}
                   onClick={() =>
                     suppress.mutate({

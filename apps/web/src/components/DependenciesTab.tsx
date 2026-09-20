@@ -366,7 +366,7 @@ export function DependenciesTab({ project }: { project: Project }) {
                         </div>
                         <button
                           type="button"
-                          className="btn-quiet"
+                          className="btn-suppress"
                           disabled={suppress.isPending}
                           onClick={() =>
                             suppress.mutate({
