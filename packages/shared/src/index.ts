@@ -263,6 +263,10 @@ export interface Project {
   /** Derived from lastCommitAt via sustainabilityStatusFor — sent from the
    * API rather than recomputed per-consumer so "now" is consistent. */
   sustainabilityStatus: SustainabilityStatus;
+  /** Web URL for "view repo" links — derived from the stored clone URL with
+   * any credentials and the trailing .git stripped, never the clone URL
+   * itself (which stays server-side only). Null when it couldn't be parsed. */
+  repoUrl: string | null;
 }
 
 export interface ProjectSettingsUpdate {

@@ -10,14 +10,23 @@ export function Modal({
   title,
   subtitle,
   onClose,
-  tabs,
+  sidebar,
+  wide,
   footer,
   children,
 }: {
   title: string;
   subtitle?: string;
   onClose: () => void;
-  tabs?: ReactNode;
+  /** Vertical nav (+ its own identity block and meta), same dialog-split/
+   * dialog-main language as ImportDialog's account switcher — the sidebar
+   * carries identity instead of the header row, so there is no separate
+   * `modal-header` when this is set; `title` still sets the dialog's
+   * aria-label. */
+  sidebar?: ReactNode;
+  /** Extra width for a sidebar layout, which needs more room for the nav
+   * column than a plain single-pane modal does. */
+  wide?: boolean;
   footer?: ReactNode;
   children: ReactNode;
 }) {
@@ -44,24 +53,42 @@ export function Modal({
       }}
     >
       <div
-        className="dialog dialog-fixed"
+        className={`dialog dialog-fixed ${wide ? 'dialog-fixed-wide' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-label={title}
       >
-        <div className="modal-header">
-          <div className="stack" style={{ gap: 2, minWidth: 0 }}>
-            <h2>{title}</h2>
-            {subtitle && <span className="subtle">{subtitle}</span>}
-          </div>
-          <button type="button" className="icon-btn" aria-label="Close" onClick={onClose}>
-            <IconX />
-          </button>
-        </div>
-
-        {tabs && <div className="modal-tabs">{tabs}</div>}
-
-        <div className="dialog-body">{children}</div>
+        {sidebar ? (
+          <>
+            <button
+              type="button"
+              className="icon-btn modal-close-float"
+              aria-label="Close"
+              onClick={onClose}
+            >
+              <IconX />
+            </button>
+            <div className="dialog-split">
+              <div className="modal-sidebar">{sidebar}</div>
+              <div className="dialog-main">
+                <div className="dialog-body">{children}</div>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="modal-header">
+              <div className="stack" style={{ gap: 2, minWidth: 0 }}>
+                <h2>{title}</h2>
+                {subtitle && <span className="subtle">{subtitle}</span>}
+              </div>
+              <button type="button" className="icon-btn" aria-label="Close" onClick={onClose}>
+                <IconX />
+              </button>
+            </div>
+            <div className="dialog-body">{children}</div>
+          </>
+        )}
 
         {footer && <div className="dialog-footer">{footer}</div>}
       </div>

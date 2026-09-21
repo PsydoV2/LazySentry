@@ -75,6 +75,19 @@ describe('response mapping', () => {
     expect(dto['gitAccountId']).toBeUndefined();
   });
 
+  it('derives a credential- and .git-stripped repoUrl from the clone url', () => {
+    const dto = toProjectDto(
+      { ...projectRow, cloneUrl: 'https://x-access-token:secret@github.com/acme/demo.git' },
+      'idle',
+    );
+    expect(dto.repoUrl).toBe('https://github.com/acme/demo');
+  });
+
+  it('falls back to null when the clone url is not http(s) or unparseable', () => {
+    expect(toProjectDto({ ...projectRow, cloneUrl: 'git@github.com:acme/demo.git' }, 'idle').repoUrl).toBeNull();
+    expect(toProjectDto({ ...projectRow, cloneUrl: 'not a url' }, 'idle').repoUrl).toBeNull();
+  });
+
   it('carries per-scanner status so a partial scan stays visible', () => {
     const scanRow: typeof scans.$inferSelect = {
       id: 7,

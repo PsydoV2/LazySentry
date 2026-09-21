@@ -746,6 +746,7 @@ button:disabled {
 }
 
 .dialog {
+  position: relative;
   width: 100%;
   max-width: 620px;
   max-height: 82vh;
@@ -969,6 +970,12 @@ button:disabled {
   max-height: none;
 }
 
+/* Sidebar layout needs more room for the nav column than a plain modal —
+   ProjectDetail opts into this via Modal's `wide` prop. */
+.dialog-fixed-wide {
+  width: min(960px, calc(100vw - 32px));
+}
+
 .modal-header {
   display: flex;
   align-items: flex-start;
@@ -979,9 +986,189 @@ button:disabled {
   flex-shrink: 0;
 }
 
-.modal-tabs {
-  padding: 0 var(--space-5);
+/* Floats over the dialog's own top-right corner rather than sitting in a
+   header row — there is no header row once a sidebar carries identity
+   instead (docs comment on Modal's `sidebar` prop). */
+.modal-close-float {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  z-index: 1;
+}
+
+/* Vertical nav variant of the modal's tab row (ProjectDetail) — same
+   dialog-split/dialog-main frame ImportDialog's account sidebar already
+   uses, so a section with real identity (counts, sustainability) reads as
+   a fixed part of the dialog instead of repeating itself in every tab. */
+.modal-sidebar {
+  width: 208px;
   flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  overflow-y: auto;
+}
+
+.modal-sidebar-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+}
+
+.modal-sidebar-head h2 {
+  font-size: 15px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* fullName ("owner/repo") has no natural break points and the sidebar is
+   narrow — truncate with an ellipsis (title attribute carries the full
+   value) rather than either wrapping or forcing horizontal scroll. */
+.modal-sidebar-head .stack {
+  width: 100%;
+  min-width: 0;
+}
+
+.modal-sidebar-head .subtle {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modal-sidebar-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius);
+  flex-shrink: 0;
+  background: var(--accent-subtle);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-sidebar-avatar svg {
+  width: 18px;
+  height: 18px;
+}
+
+.modal-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.modal-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  border: 0;
+  border-left: 2px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: var(--radius);
+  padding: 8px 8px 8px 10px;
+  font-size: 13px;
+}
+
+.modal-nav-item:hover:not(.is-active) {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.modal-nav-item.is-active {
+  background: var(--accent-subtle);
+  border-left-color: var(--accent);
+  color: var(--text);
+  font-weight: 500;
+}
+
+.modal-nav-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.modal-nav-badge {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-subtle);
+  background: var(--border);
+  border-radius: 999px;
+  padding: 1px 6px;
+}
+
+.modal-nav-item.is-active .modal-nav-badge {
+  color: var(--accent);
+  background: var(--surface);
+}
+
+.modal-sidebar-meta {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+  color: var(--text-subtle);
+  font-size: 12px;
+}
+
+.modal-sidebar-meta svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+/* The one actual call to action in the sidebar footer (vs. the last-scan/
+   sustainability text above it) — a full-width bordered button rather than
+   an inline text link, so it reads as clickable and stands out from the
+   surrounding metadata instead of blending into it. */
+.modal-repo-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 2px;
+  padding: 9px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.modal-repo-link:hover {
+  border-color: var(--accent);
+  background: var(--bg);
+}
+
+.modal-repo-link svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* Main pane of the sidebar layout also starts right at the dialog's top
+   edge (no header row above it), and its content runs the full width up to
+   the same right edge the floating close button sits on — enough top
+   padding to clear the button's full footprint (space-3 offset + its own
+   height), not just nudge past its top edge. */
+.dialog-split > .dialog-main > .dialog-body {
+  padding-top: var(--space-7);
 }
 
 /* ---------- project grid & cards (8.1) ----------
@@ -1571,34 +1758,6 @@ button:disabled {
 .pill-neutral {
   background: var(--border);
   color: var(--text-muted);
-}
-
-/* ---------- detail view ---------- */
-
-.tabs {
-  display: flex;
-  gap: var(--space-1);
-  border-bottom: 1px solid var(--border);
-}
-
-.tab {
-  padding: var(--space-2) var(--space-3);
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--text-muted);
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-}
-
-.tab:hover:not(.is-active) {
-  color: var(--text);
-}
-
-.tab.is-active {
-  color: var(--text);
-  border-bottom-color: var(--accent);
-  font-weight: 500;
 }
 
 /* ---------- tab toolbars (dependencies & secrets) ----------

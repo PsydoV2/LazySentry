@@ -33,6 +33,25 @@ type SecretRow = typeof secrets.$inferSelect;
 const ms = (value: Date | null | undefined): number | null =>
   value ? value.getTime() : null;
 
+/** Safe-to-display "view repo" link derived from the stored clone URL — with
+ * any embedded credentials and the trailing .git stripped. The clone URL
+ * itself is never sent to the frontend (see dto.test.ts). Credentials never
+ * actually reach cloneUrl in this app (auth goes through GIT_CONFIG env vars,
+ * see scanner/clone.ts), but this strips them anyway rather than relying on
+ * that. */
+function safeRepoUrl(cloneUrl: string): string | null {
+  try {
+    const url = new URL(cloneUrl);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+    url.username = '';
+    url.password = '';
+    url.pathname = url.pathname.replace(/\.git$/, '');
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
 export function toProjectDto(
   row: ProjectRow,
   scanState: ScanState,
@@ -70,6 +89,7 @@ export function toProjectDto(
     lastScannedCommitSha: row.lastScannedCommitSha,
     lastCommitAt: ms(row.lastCommitAt),
     sustainabilityStatus: sustainabilityStatusFor(ms(row.lastCommitAt)),
+    repoUrl: safeRepoUrl(row.cloneUrl),
   };
 }
 
