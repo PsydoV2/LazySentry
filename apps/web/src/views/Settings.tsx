@@ -105,6 +105,24 @@ const CHANNEL_URL_PLACEHOLDER: Record<NotificationPlatformId, string> = {
   webhook: 'https://example.com/webhook',
 };
 
+type SettingsSection = 'accounts' | 'notifications' | 'schedule' | 'users' | 'api-keys';
+
+const SECTION_LABEL: Record<SettingsSection, string> = {
+  accounts: 'Accounts',
+  notifications: 'Notifications',
+  schedule: 'Scan schedule',
+  users: 'Users',
+  'api-keys': 'API keys',
+};
+
+const SECTION_ICON: Record<SettingsSection, typeof IconUser> = {
+  accounts: IconUser,
+  notifications: IconBell,
+  schedule: IconClock,
+  users: IconUsers,
+  'api-keys': IconKey,
+};
+
 export function Settings({
   onClose,
   currentUser,
@@ -115,6 +133,7 @@ export function Settings({
   const isAdmin = currentUser.role === 'admin';
   const queryClient = useQueryClient();
   const [addingProvider, setAddingProvider] = useState<GitProviderId | null>(null);
+  const [section, setSection] = useState<SettingsSection>('accounts');
 
   const accounts = useQuery({
     queryKey: ['git-accounts'],
@@ -135,79 +154,123 @@ export function Settings({
     setAddingProvider((current) => (current === id ? null : id));
   }
 
+  const sections: SettingsSection[] = [
+    'accounts',
+    'notifications',
+    'schedule',
+    ...(isAdmin ? (['users'] as const) : []),
+    'api-keys',
+  ];
+
   return (
     <Modal
       title="Settings"
-      subtitle="Connected accounts and credentials for this instance."
       onClose={onClose}
+      wide
+      sidebar={
+        <>
+          <div className="modal-sidebar-head">
+            <div className="modal-sidebar-avatar" aria-hidden="true">
+              <IconUser />
+            </div>
+            <div className="stack" style={{ gap: 2 }}>
+              <h2 title={currentUser.username}>{currentUser.username}</h2>
+              <span className="subtle">This instance</span>
+            </div>
+            <span className={`pill ${isAdmin ? 'pill-info' : 'pill-neutral'}`}>
+              {isAdmin ? 'Admin' : 'Member'}
+            </span>
+          </div>
+          <nav className="modal-nav">
+            {sections.map((value) => {
+              const Icon = SECTION_ICON[value];
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  className={`modal-nav-item ${section === value ? 'is-active' : ''}`}
+                  onClick={() => setSection(value)}
+                >
+                  <Icon className="modal-nav-icon" />
+                  {SECTION_LABEL[value]}
+                </button>
+              );
+            })}
+          </nav>
+        </>
+      }
     >
-      <div className="stack">
-        <div className="card stack">
-          <div className="row">
-            <IconUser />
-            <h2>Accounts</h2>
+      {section === 'accounts' && (
+        <div className="stack">
+          <div className="card stack">
+            <div className="row">
+              <IconUser />
+              <h2>Accounts</h2>
+            </div>
+
+            {!isAdmin && (
+              <p className="subtle">Only admins can connect, reconnect or remove accounts.</p>
+            )}
+
+            {isAdmin && (
+              <div className="row" style={{ gap: 8 }}>
+                {providers.data?.providers.map((provider) => (
+                  <button
+                    key={provider.id}
+                    type="button"
+                    className={`provider-add-btn ${addingProvider === provider.id ? 'is-active' : ''}`}
+                    onClick={() => toggleAddProvider(provider.id)}
+                  >
+                    <ProviderIcon provider={provider.id} />
+                    {provider.label}
+                    <IconPlus />
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {accounts.isLoading && <p className="muted">Loading…</p>}
+            {accounts.isError && (
+              <p className="notice notice-error">
+                {accounts.error instanceof ApiError
+                  ? accounts.error.message
+                  : 'Could not load connected accounts.'}
+              </p>
+            )}
+
+            {accounts.data && accounts.data.accounts.length === 0 && !addingProvider && (
+              <p className="subtle">No accounts connected yet.</p>
+            )}
+
+            {accounts.data?.accounts.map((account) => (
+              <AccountRow
+                key={account.id}
+                account={account}
+                canManage={isAdmin}
+                onChanged={invalidateAccounts}
+              />
+            ))}
           </div>
 
-          {!isAdmin && (
-            <p className="subtle">Only admins can connect, reconnect or remove accounts.</p>
-          )}
-
-          {isAdmin && (
-            <div className="row" style={{ gap: 8 }}>
-              {providers.data?.providers.map((provider) => (
-                <button
-                  key={provider.id}
-                  type="button"
-                  className={`provider-add-btn ${addingProvider === provider.id ? 'is-active' : ''}`}
-                  onClick={() => toggleAddProvider(provider.id)}
-                >
-                  <ProviderIcon provider={provider.id} />
-                  {provider.label}
-                  <IconPlus />
-                </button>
-              ))}
-            </div>
-          )}
-
-          {accounts.isLoading && <p className="muted">Loading…</p>}
-          {accounts.isError && (
-            <p className="notice notice-error">
-              {accounts.error instanceof ApiError
-                ? accounts.error.message
-                : 'Could not load connected accounts.'}
-            </p>
-          )}
-
-          {accounts.data && accounts.data.accounts.length === 0 && !addingProvider && (
-            <p className="subtle">No accounts connected yet.</p>
-          )}
-
-          {accounts.data?.accounts.map((account) => (
-            <AccountRow
-              key={account.id}
-              account={account}
-              canManage={isAdmin}
-              onChanged={invalidateAccounts}
+          {isAdmin && addingProvider && (
+            <AddAccountPopup
+              provider={addingProvider}
+              label={
+                providers.data?.providers.find((p) => p.id === addingProvider)?.label ??
+                addingProvider
+              }
+              onClose={() => setAddingProvider(null)}
+              onConnected={invalidateAccounts}
             />
-          ))}
+          )}
         </div>
+      )}
 
-        {isAdmin && addingProvider && (
-          <AddAccountPopup
-            provider={addingProvider}
-            label={
-              providers.data?.providers.find((p) => p.id === addingProvider)?.label ??
-              addingProvider
-            }
-            onClose={() => setAddingProvider(null)}
-            onConnected={invalidateAccounts}
-          />
-        )}
+      {section === 'notifications' && <NotificationsCard />}
+      {section === 'schedule' && <ScanScheduleCard />}
+      {section === 'users' && isAdmin && <UsersCard currentUserId={currentUser.id} />}
 
-        <NotificationsCard />
-        <ScanScheduleCard />
-        {isAdmin && <UsersCard currentUserId={currentUser.id} />}
-
+      {section === 'api-keys' && (
         <div className="card stack">
           <div className="row">
             <IconKey />
@@ -218,7 +281,7 @@ export function Settings({
             yet.
           </p>
         </div>
-      </div>
+      )}
     </Modal>
   );
 }
