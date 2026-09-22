@@ -10,11 +10,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Project, ProjectSection } from '@lazysentry/shared';
 import { AddSectionRow } from '../components/AddSectionRow';
 import { DashboardGroup, maxSectionWidth } from '../components/DashboardGroup';
+import { FleetPulseStrip } from '../components/FleetPulseStrip';
 import { ImportDialog } from '../components/ImportDialog';
 import { ProjectCard } from '../components/ProjectCard';
 import { SectionHeader } from '../components/SectionHeader';
 import { UpdateBanner } from '../components/UpdateBanner';
-import { IconFolder, IconPin, IconPlus } from '../components/icons';
+import { IconFolder, IconPin, IconPlus, IconSearch } from '../components/icons';
 import { api } from '../lib/api';
 import { sortByUrgency } from '../lib/card-state';
 import { useDashboardDnd } from '../lib/dashboard-dnd';
@@ -26,8 +27,10 @@ import type { Route } from '../lib/router';
 
 export function Dashboard({
   navigate,
+  onOpenSearch,
 }: {
   navigate: (route: Route) => void;
+  onOpenSearch: () => void;
 }) {
   const queryClient = useQueryClient();
   const [importing, setImporting] = useState(false);
@@ -174,17 +177,36 @@ export function Dashboard({
                 (lastScan ? ` · last scan ${relativeTime(lastScan)}` : '')}
           </span>
         </div>
-        <button
-          type="button"
-          className="btn-text-icon"
-          onClick={() => setImporting(true)}
-        >
-          <IconPlus />
-          Import project
-        </button>
+        <div className="dashboard-heading-actions">
+          <button
+            type="button"
+            className="fleet-search-trigger"
+            onClick={onOpenSearch}
+          >
+            <IconSearch className="fleet-search-trigger-icon" />
+            <span>Search packages…</span>
+            <span className="fleet-search-trigger-shortcut">⌘K</span>
+          </button>
+          <button
+            type="button"
+            className="btn-text-icon"
+            onClick={() => setImporting(true)}
+          >
+            <IconPlus />
+            Import project
+          </button>
+        </div>
       </div>
 
       {isLoading && <p className="muted">Loading…</p>}
+
+      {!isLoading && allProjects.length > 0 && (
+        <div
+          style={sectionWidth ? { width: sectionWidth, margin: '0 auto' } : undefined}
+        >
+          <FleetPulseStrip projects={allProjects} navigate={navigate} />
+        </div>
+      )}
 
       {isEmpty && (
         <div className="tab-empty-state dashboard-empty-state">

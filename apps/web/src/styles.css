@@ -235,12 +235,30 @@ a:hover {
 
 /* ---------- layout ---------- */
 
+/* App shell: a fixed-width sidebar plus everything else (docs/CONCEPT.md
+   8.0's one piece of permanent navigation chrome). */
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.app-main {
+  flex: 1;
+  min-width: 0;
+}
+
 .dashboard-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
   flex-wrap: wrap;
+}
+
+.dashboard-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
 }
 
 .page {
@@ -251,9 +269,6 @@ a:hover {
   max-width: 1800px;
   margin: 0 auto;
   padding: var(--space-6);
-  /* Clears the floating avatar fixed to the top-right corner (rule: no more
-     bordered top bar, so page content has to make its own room instead). */
-  padding-top: 64px;
 }
 
 .centered-page {
@@ -2019,39 +2034,138 @@ button:disabled {
    Replaces the old top bar: a round avatar placeholder fixed to the
    top-right corner of every screen, opening onto Settings and sign-out. */
 
-.user-menu {
-  position: fixed;
-  top: 16px;
-  right: 20px;
-  z-index: 5;
+/* ---------- sidebar (docs/CONCEPT.md 8.0) ----------
+   The app's one piece of permanent navigation chrome: logo, Dashboard/
+   Settings/Audit-log, and the account control anchored to the bottom.
+   Fleet search and trends deliberately have no entry here — see
+   FleetSearchTrigger (Dashboard header) and FleetPulseStrip. */
+
+.sidebar {
+  width: 220px;
+  min-width: 220px;
+  height: 100vh;
+  /* Pinned to the viewport instead of stretching with the page's content —
+     .app-main scrolls the dashboard grid on its own, the sidebar never
+     needs to. */
+  position: sticky;
+  top: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-4) var(--space-3);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
 }
 
-.user-menu-avatar {
+.sidebar-logo {
+  padding: var(--space-2) var(--space-2) var(--space-5) var(--space-2);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar-nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13.5px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.sidebar-nav-item svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.sidebar-nav-item:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.sidebar-nav-item.is-active {
+  background: var(--accent-subtle);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.sidebar-spacer {
+  flex: 1;
+}
+
+.sidebar-user {
+  position: relative;
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-2);
+}
+
+.sidebar-user-trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  text-align: left;
+}
+
+.sidebar-user-trigger:hover {
+  background: var(--bg);
+}
+
+.sidebar-user-avatar {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  border: 1px solid var(--border-strong);
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
   border-radius: 50%;
   background: var(--accent-subtle);
   color: var(--accent);
 }
 
-.user-menu-avatar:hover {
-  background: color-mix(in srgb, var(--accent) 18%, var(--accent-subtle));
+.sidebar-user-avatar svg {
+  width: 15px;
+  height: 15px;
 }
 
-.user-menu-avatar svg {
-  width: 18px;
-  height: 18px;
+.sidebar-user-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-user-name {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-user-role {
+  font-size: 11px;
+  color: var(--text-subtle);
+  text-transform: capitalize;
 }
 
 .user-menu-dropdown {
   position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
   min-width: 190px;
   padding: var(--space-2);
   background: var(--surface);
@@ -2061,13 +2175,11 @@ button:disabled {
   z-index: 6;
 }
 
-.user-menu-name {
-  padding: var(--space-2) var(--space-3);
-  font-weight: 600;
-  font-size: 13px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+/* Opens upward from the sidebar footer instead of downward — anchored at
+   the bottom of the screen, a downward menu would run off it. */
+.user-menu-dropdown-up {
+  bottom: calc(100% + 8px);
+  left: 0;
 }
 
 .user-menu-theme {
@@ -2135,4 +2247,343 @@ button:disabled {
 .user-menu-item-danger:hover:not(:disabled) {
   color: var(--danger-text);
   background: var(--danger-bg);
+}
+
+/* ---------- fleet search trigger (dashboard header, docs/CONCEPT.md 2.2) ----------
+   Reads as a search input but is a button: clicking (or ⌘K from anywhere)
+   opens the CommandPalette, which does the actual live querying. */
+
+.fleet-search-trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 260px;
+  padding: 8px var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text-subtle);
+  font-size: 13px;
+  text-align: left;
+}
+
+.fleet-search-trigger:hover {
+  border-color: var(--accent);
+  color: var(--text-muted);
+}
+
+.fleet-search-trigger-icon {
+  flex-shrink: 0;
+}
+
+.fleet-search-trigger span:nth-child(2) {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fleet-search-trigger-shortcut {
+  flex-shrink: 0;
+  font-size: 11px;
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-subtle);
+}
+
+/* ---------- fleet pulse strip (docs/CONCEPT.md 2.2) ----------
+   One narrow row on the dashboard, not a dedicated page: live finding count
+   + sparkline, live sustainability distribution, and the only way to reach
+   the fuller trends view. */
+
+.fleet-pulse {
+  display: flex;
+  align-items: center;
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+/* Left and right each take exactly half the strip — the left side's
+   content (and the sustainability bar within it) stretches to fill its
+   half instead of staying compact, so "Open trends" on the right isn't
+   left stranded behind a huge empty gap. */
+.fleet-pulse-left {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+}
+
+.fleet-pulse-right {
+  flex: 1;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.fleet-pulse-block {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+.fleet-pulse-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.fleet-pulse-sublabel {
+  font-size: 12px;
+  color: var(--text-subtle);
+}
+
+.fleet-pulse-sparkline-block {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.fleet-pulse-count {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 12.5px;
+}
+
+.fleet-pulse-delta-down {
+  color: var(--signal-ok);
+  font-size: 11.5px;
+}
+
+.fleet-pulse-delta-up {
+  color: var(--signal-critical);
+  font-size: 11.5px;
+}
+
+.fleet-pulse-divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border);
+}
+
+.fleet-pulse-sustain-block {
+  flex: 1;
+  min-width: 140px;
+}
+
+.fleet-pulse-sustain-bar {
+  display: flex;
+  width: 100%;
+  max-width: 360px;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.fleet-pulse-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.fleet-pulse-link:hover {
+  color: var(--accent-hover);
+}
+
+.fleet-pulse-link svg:first-child {
+  width: 15px;
+  height: 15px;
+}
+
+.fleet-pulse-link svg:last-child {
+  width: 14px;
+  height: 14px;
+}
+
+/* ---------- command palette (⌘K fleet search, docs/CONCEPT.md 2.2) ---------- */
+
+.command-palette-backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--backdrop);
+  display: flex;
+  justify-content: center;
+  padding: 96px var(--space-5) var(--space-5);
+  z-index: 10;
+}
+
+.command-palette {
+  width: 100%;
+  max-width: 640px;
+  max-height: calc(100vh - 160px);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-float);
+  overflow: hidden;
+}
+
+.command-palette-input-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.command-palette-input-icon {
+  color: var(--text-subtle);
+  flex-shrink: 0;
+}
+
+.command-palette-input {
+  flex: 1;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 14.5px;
+}
+
+.command-palette-hint {
+  padding: var(--space-4);
+}
+
+.command-palette-list {
+  overflow-y: auto;
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.command-palette-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-2);
+  border-radius: var(--radius);
+}
+
+.command-palette-row:hover {
+  background: var(--bg);
+}
+
+.command-palette-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.command-palette-row-name {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.command-palette-footer {
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+/* ---------- fleet trends modal (docs/CONCEPT.md 2.2) ---------- */
+
+.fleet-trends-range {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  width: fit-content;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.fleet-trends-range-btn {
+  padding: 5px 12px;
+  border: 0;
+  border-radius: calc(var(--radius) - 2px);
+  background: transparent;
+  color: var(--text-subtle);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.fleet-trends-range-btn.is-active {
+  background: var(--surface);
+  color: var(--accent);
+}
+
+.fleet-chart {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+}
+
+.fleet-chart-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: var(--space-3);
+}
+
+.fleet-chart-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.fleet-chart-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-subtle);
+}
+
+.fleet-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.fleet-chart-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.fleet-chart-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
 }

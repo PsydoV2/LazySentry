@@ -487,6 +487,61 @@ export interface SuppressionUpdate {
   suppressed: boolean;
 }
 
+// ---- fleet-wide package query & trends (docs/CONCEPT.md 2.2) ----
+//
+// Two deliberately narrow features sharing one query foundation: an
+// incident-response search over every project's latest scan snapshot, and
+// two — only two — time-series charts, never a general analytics page.
+
+/** GET /api/fleet/packages — answers from each project's latest scan
+ * snapshot; never triggers a new scan. */
+export interface FleetPackageQueryInput {
+  name: string;
+  /** npm-style range/comparator, e.g. "< 4.17.21" or "^2.0.0". */
+  range?: string;
+}
+
+export interface FleetPackageMatch {
+  projectId: number;
+  projectName: string;
+  projectFullName: string;
+  lastScanAt: number | null;
+  ecosystem: string;
+  packageName: string;
+  versionInstalled: string;
+  isDirect: boolean | null;
+}
+
+export interface FleetPackageMatches {
+  matches: FleetPackageMatch[];
+}
+
+/** GET /api/fleet/trends. */
+export type FleetTrendsRange = '30d' | '90d' | '1y';
+
+/**
+ * One calendar day's fleet-wide aggregate counts, sampled once a day going
+ * forward (apps/api/src/scan/fleet-snapshot.ts) — not a historical
+ * reconstruction, so a fresh instance has only as many points as days
+ * since it started capturing them.
+ */
+export interface FleetTrendPoint {
+  date: string; // 'YYYY-MM-DD'
+  countVulnCritical: number;
+  countVulnHigh: number;
+  countVulnMedium: number;
+  countVulnLow: number;
+  countSustainActive: number;
+  countSustainAging: number;
+  countSustainStale: number;
+  countSustainDead: number;
+  countSustainUnknown: number;
+}
+
+export interface FleetTrendPoints {
+  points: FleetTrendPoint[];
+}
+
 // ---- live updates (docs/CONCEPT.md 3.5) ----
 
 export const SCAN_EVENT_TYPES = [

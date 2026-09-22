@@ -17,7 +17,8 @@ export type Route =
   | { name: 'dashboard' }
   | { name: 'project'; id: number; tab?: ProjectTab }
   | { name: 'settings' }
-  | { name: 'audit-log' };
+  | { name: 'audit-log' }
+  | { name: 'trends' };
 
 function parseHash(hash: string): Route {
   const match = /^#\/projects\/(\d+)(?:\/(\w+))?$/.exec(hash);
@@ -33,6 +34,7 @@ function parseHash(hash: string): Route {
   }
   if (hash === '#/settings') return { name: 'settings' };
   if (hash === '#/audit-log') return { name: 'audit-log' };
+  if (hash === '#/trends') return { name: 'trends' };
   return { name: 'dashboard' };
 }
 
@@ -55,7 +57,9 @@ export function useRoute(): [Route, (route: Route) => void] {
           ? '#/settings'
           : next.name === 'audit-log'
             ? '#/audit-log'
-            : '#/';
+            : next.name === 'trends'
+              ? '#/trends'
+              : '#/';
   };
 
   return [route, navigate];

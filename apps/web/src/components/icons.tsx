@@ -377,3 +377,32 @@ export function IconHistory(props: IconProps) {
     </svg>
   );
 }
+
+export function IconGrid(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+    </svg>
+  );
+}
+
+export function IconSearch(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m21 21-4.3-4.3" />
+    </svg>
+  );
+}
+
+export function IconTrendingUp(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M3 17 9 11 13 15 21 7" />
+      <path d="M15 7h6v6" />
+    </svg>
+  );
+}

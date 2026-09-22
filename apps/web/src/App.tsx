@@ -1,9 +1,12 @@
+import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { UserMenu } from './components/UserMenu';
+import { CommandPalette } from './components/CommandPalette';
+import { Sidebar } from './components/Sidebar';
 import { api, ApiError, type CurrentUser, type SetupStatus } from './lib/api';
 import { useRoute } from './lib/router';
 import { AuditLog } from './views/AuditLog';
 import { Dashboard } from './views/Dashboard';
+import { FleetTrends } from './views/FleetTrends';
 import { Login } from './views/Login';
 import { ProjectDetail } from './views/ProjectDetail';
 import { Settings } from './views/Settings';
@@ -12,6 +15,20 @@ import { SetupWizard } from './views/SetupWizard';
 export function App() {
   const queryClient = useQueryClient();
   const [route, navigate] = useRoute();
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  // Fleet search has no permanent nav item (docs/CONCEPT.md 2.2) — ⌘K/Ctrl+K
+  // opens it from anywhere, same as a command palette in any other tool.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   const setup = useQuery({
     queryKey: ['setup-status'],
@@ -68,43 +85,51 @@ export function App() {
     return <SetupWizard status={setup.data} onComplete={invalidateAll} />;
   }
 
-  // The avatar in the corner is the only piece of chrome shared by every
-  // screen now that the top bar is gone — rendered once here rather than in
-  // each view (docs/CONCEPT.md 8.0).
-  const userMenu = (
-    <UserMenu user={session.data} navigate={navigate} onSignedOut={invalidateAll} />
-  );
-
-  // Project detail and settings open as a centered modal over the dashboard
-  // rather than replacing it — the dashboard (and its SSE-driven state)
-  // stays mounted underneath, and closing the modal is instant instead of a
-  // refetch. The route still changes underneath the modal, so deep links,
-  // reload and the browser back button keep working.
+  // Sidebar is the app's one piece of permanent navigation chrome
+  // (docs/CONCEPT.md 8.0). Project detail, settings, the audit log and
+  // trends open as a centered modal over the dashboard rather than
+  // replacing it — the dashboard (and its SSE-driven state) stays mounted
+  // underneath, and closing the modal is instant instead of a refetch. The
+  // route still changes underneath the modal, so deep links, reload and the
+  // browser back button keep working.
   return (
-    <>
-      {userMenu}
-      <Dashboard navigate={navigate} />
-      {route.name === 'project' && (
-        // Keyed on the id so navigating from one project straight to
-        // another remounts the view — otherwise the active tab (and each
-        // tab's own filter state) would carry over from the previous
-        // project.
-        <ProjectDetail
-          key={route.id}
-          projectId={route.id}
-          initialTab={route.tab}
-          onClose={() => navigate({ name: 'dashboard' })}
-        />
-      )}
-      {route.name === 'settings' && (
-        <Settings
-          currentUser={session.data}
-          onClose={() => navigate({ name: 'dashboard' })}
-        />
-      )}
-      {route.name === 'audit-log' && session.data.role === 'admin' && (
-        <AuditLog onClose={() => navigate({ name: 'dashboard' })} />
-      )}
-    </>
+    <div className="app-shell">
+      <Sidebar
+        user={session.data}
+        route={route}
+        navigate={navigate}
+        onSignedOut={invalidateAll}
+      />
+      <div className="app-main">
+        <Dashboard navigate={navigate} onOpenSearch={() => setSearchOpen(true)} />
+        {route.name === 'project' && (
+          // Keyed on the id so navigating from one project straight to
+          // another remounts the view — otherwise the active tab (and each
+          // tab's own filter state) would carry over from the previous
+          // project.
+          <ProjectDetail
+            key={route.id}
+            projectId={route.id}
+            initialTab={route.tab}
+            onClose={() => navigate({ name: 'dashboard' })}
+          />
+        )}
+        {route.name === 'settings' && (
+          <Settings
+            currentUser={session.data}
+            onClose={() => navigate({ name: 'dashboard' })}
+          />
+        )}
+        {route.name === 'audit-log' && session.data.role === 'admin' && (
+          <AuditLog onClose={() => navigate({ name: 'dashboard' })} />
+        )}
+        {route.name === 'trends' && (
+          <FleetTrends onClose={() => navigate({ name: 'dashboard' })} />
+        )}
+        {searchOpen && (
+          <CommandPalette onClose={() => setSearchOpen(false)} navigate={navigate} />
+        )}
+      </div>
+    </div>
   );
 }

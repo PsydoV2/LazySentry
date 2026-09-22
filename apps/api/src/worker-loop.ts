@@ -16,6 +16,7 @@ import {
   recoverOrphanedJobs,
   type Job,
 } from './queue/jobs.js';
+import { captureDueFleetSnapshot } from './scan/fleet-snapshot.js';
 import { recoverOrphanedScans } from './scan/recovery.js';
 import { runScan } from './scan/run-scan.js';
 import { enqueueDueScheduledScans } from './scan/schedule.js';
@@ -25,7 +26,8 @@ import { execute } from './scanner/exec.js';
 import { SCANNER_VERSIONS } from './scanner/versions.js';
 
 const POLL_INTERVAL_MS = 1000;
-// The schedule check runs on its own cadence inside the same poll loop
+// The schedule check — and the daily fleet-trend snapshot (docs/CONCEPT.md
+// 2.2) alongside it — runs on its own cadence inside the same poll loop
 // rather than a second timer — cheap enough not to need one, and this keeps
 // concurrency at 1 (docs/CONCEPT.md 0.1): a scheduled scan is just another
 // row in the same jobs table, claimed like any other.
@@ -171,6 +173,7 @@ export async function startWorker(): Promise<void> {
         lastScheduleCheck = Date.now();
         const enqueued = enqueueDueScheduledScans();
         if (enqueued > 0) log(`enqueued ${enqueued} scheduled scan(s)`);
+        if (captureDueFleetSnapshot()) log('captured daily fleet snapshot');
       }
       await sleep(POLL_INTERVAL_MS);
     }

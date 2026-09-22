@@ -345,6 +345,38 @@ export const notificationChannels = sqliteTable('notification_channels', {
 });
 
 /**
+ * One row per calendar day, capturing the fleet-wide aggregate counts that
+ * power the two trend charts (docs/CONCEPT.md 2.2) — severity burndown and
+ * sustainability-status distribution. Deliberately a daily sample of the
+ * same denormalized counters the dashboard cards already show, not a full
+ * historical reconstruction: captured once a day going forward from
+ * whenever this shipped, never backfilled (11. "kein falsches Grün" — a
+ * chart with three real days of history looks like three days, not more).
+ * Written by scan/fleet-snapshot.ts from the worker's poll loop.
+ */
+export const fleetSnapshots = sqliteTable(
+  'fleet_snapshots',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    // Server-local calendar date, 'YYYY-MM-DD' — text rather than a
+    // timestamp so "at most one per day" is a plain unique index instead of
+    // a range check.
+    date: text('date').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    countVulnCritical: integer('count_vuln_critical').notNull().default(0),
+    countVulnHigh: integer('count_vuln_high').notNull().default(0),
+    countVulnMedium: integer('count_vuln_medium').notNull().default(0),
+    countVulnLow: integer('count_vuln_low').notNull().default(0),
+    countSustainActive: integer('count_sustain_active').notNull().default(0),
+    countSustainAging: integer('count_sustain_aging').notNull().default(0),
+    countSustainStale: integer('count_sustain_stale').notNull().default(0),
+    countSustainDead: integer('count_sustain_dead').notNull().default(0),
+    countSustainUnknown: integer('count_sustain_unknown').notNull().default(0),
+  },
+  (table) => [uniqueIndex('fleet_snapshots_date_unique').on(table.date)],
+);
+
+/**
  * Security-relevant, state-changing actions only (docs/CONCEPT.md 2.2, 6.2) —
  * not every GET request and not routine finding suppression. `username` is a
  * snapshot at the time of the action rather than a join against `users`, so

@@ -6,6 +6,8 @@
 
 import {
   sustainabilityStatusFor,
+  type FleetPackageMatch,
+  type FleetTrendPoint,
   type PackageEntry,
   type Project,
   type ProjectSection,
@@ -15,6 +17,7 @@ import {
   type Vulnerability,
 } from '@lazysentry/shared';
 import type {
+  fleetSnapshots,
   packages,
   projects,
   projectSections,
@@ -22,6 +25,7 @@ import type {
   secrets,
   vulnerabilities,
 } from '../db/schema.js';
+import type { FleetPackageMatchRow } from '../scan/fleet-query.js';
 
 type ProjectRow = typeof projects.$inferSelect;
 type ProjectSectionRow = typeof projectSections.$inferSelect;
@@ -29,6 +33,7 @@ type ScanRow = typeof scans.$inferSelect;
 type PackageRow = typeof packages.$inferSelect;
 type VulnerabilityRow = typeof vulnerabilities.$inferSelect;
 type SecretRow = typeof secrets.$inferSelect;
+type FleetSnapshotRow = typeof fleetSnapshots.$inferSelect;
 
 const ms = (value: Date | null | undefined): number | null =>
   value ? value.getTime() : null;
@@ -163,6 +168,34 @@ export function toVulnerabilityDto(
     packageName: pkg?.name ?? null,
     packageEcosystem: pkg?.ecosystem ?? null,
     packageVersion: pkg?.versionInstalled ?? null,
+  };
+}
+
+export function toFleetPackageMatchDto(row: FleetPackageMatchRow): FleetPackageMatch {
+  return {
+    projectId: row.projectId,
+    projectName: row.projectName,
+    projectFullName: row.projectFullName,
+    lastScanAt: ms(row.lastScanAt),
+    ecosystem: row.ecosystem,
+    packageName: row.packageName,
+    versionInstalled: row.versionInstalled,
+    isDirect: row.isDirect,
+  };
+}
+
+export function toFleetTrendPointDto(row: FleetSnapshotRow): FleetTrendPoint {
+  return {
+    date: row.date,
+    countVulnCritical: row.countVulnCritical,
+    countVulnHigh: row.countVulnHigh,
+    countVulnMedium: row.countVulnMedium,
+    countVulnLow: row.countVulnLow,
+    countSustainActive: row.countSustainActive,
+    countSustainAging: row.countSustainAging,
+    countSustainStale: row.countSustainStale,
+    countSustainDead: row.countSustainDead,
+    countSustainUnknown: row.countSustainUnknown,
   };
 }
 

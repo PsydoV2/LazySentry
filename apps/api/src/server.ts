@@ -19,6 +19,7 @@ import { AppError, NOT_FOUND_BODY, registerErrorHandler } from './lib/errors.js'
 import { registerAuditLogRoutes } from './routes/audit-log.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerEventRoutes } from './routes/events.js';
+import { registerFleetRoutes } from './routes/fleet.js';
 import { registerGitAccountRoutes } from './routes/git-accounts.js';
 import { registerNotificationChannelRoutes } from './routes/notification-channels.js';
 import { registerProjectRoutes } from './routes/projects.js';
@@ -89,6 +90,7 @@ export async function startApi(): Promise<FastifyInstance> {
   registerSetupRoutes(app);
   registerAuditLogRoutes(app);
   registerAuthRoutes(app);
+  registerFleetRoutes(app);
   registerGitAccountRoutes(app);
   registerNotificationChannelRoutes(app);
   registerProjectRoutes(app);

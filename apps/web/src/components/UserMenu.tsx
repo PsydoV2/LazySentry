@@ -1,21 +1,12 @@
-// Floating account control (replaces the old top bar): a round avatar
-// placeholder fixed to the top-right corner of every screen, opening onto
-// Settings and sign-out — the only two things that used to live in the bar.
+// Account control anchored to the bottom of the sidebar (docs/CONCEPT.md
+// 8.0): identity, theme and sign-out — Settings and the audit log are their
+// own sidebar nav items now, so they don't need a second home here.
 
 import { useEffect, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { api, type CurrentUser } from '../lib/api';
-import type { Route } from '../lib/router';
 import { type Theme, useTheme } from '../lib/theme';
-import {
-  IconHistory,
-  IconLogOut,
-  IconMonitor,
-  IconMoon,
-  IconSettings,
-  IconSun,
-  IconUser,
-} from './icons';
+import { IconLogOut, IconMonitor, IconMoon, IconSun, IconUser } from './icons';
 
 const THEME_OPTIONS: { value: Theme; label: string; icon: typeof IconSun }[] = [
   { value: 'system', label: 'Match system theme', icon: IconMonitor },
@@ -25,11 +16,9 @@ const THEME_OPTIONS: { value: Theme; label: string; icon: typeof IconSun }[] = [
 
 export function UserMenu({
   user,
-  navigate,
   onSignedOut,
 }: {
   user: CurrentUser;
-  navigate: (route: Route) => void;
   onSignedOut: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -60,26 +49,9 @@ export function UserMenu({
   });
 
   return (
-    <div className="user-menu" ref={rootRef}>
-      <button
-        type="button"
-        className="user-menu-avatar"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        title={user.username}
-        onClick={() => setOpen((value) => !value)}
-      >
-        <IconUser />
-      </button>
-
+    <div className="sidebar-user" ref={rootRef}>
       {open && (
-        <div className="user-menu-dropdown" role="menu">
-          <div className="user-menu-name">
-            {user.username}
-            <span className="subtle"> · {user.role}</span>
-          </div>
-          <hr className="divider" style={{ margin: '6px 0' }} />
-
+        <div className="user-menu-dropdown user-menu-dropdown-up" role="menu">
           <div className="user-menu-theme">
             <span className="user-menu-theme-label">Theme</span>
             <div className="theme-toggle" role="group" aria-label="Theme">
@@ -103,30 +75,6 @@ export function UserMenu({
           <button
             type="button"
             role="menuitem"
-            className="user-menu-item"
-            onClick={() => {
-              setOpen(false);
-              navigate({ name: 'settings' });
-            }}
-          >
-            <IconSettings /> Settings
-          </button>
-          {user.role === 'admin' && (
-            <button
-              type="button"
-              role="menuitem"
-              className="user-menu-item"
-              onClick={() => {
-                setOpen(false);
-                navigate({ name: 'audit-log' });
-              }}
-            >
-              <IconHistory /> Audit log
-            </button>
-          )}
-          <button
-            type="button"
-            role="menuitem"
             className="user-menu-item user-menu-item-danger"
             disabled={signOut.isPending}
             onClick={() => signOut.mutate()}
@@ -135,6 +83,22 @@ export function UserMenu({
           </button>
         </div>
       )}
+
+      <button
+        type="button"
+        className="sidebar-user-trigger"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <span className="sidebar-user-avatar" aria-hidden="true">
+          <IconUser />
+        </span>
+        <span className="sidebar-user-text">
+          <span className="sidebar-user-name">{user.username}</span>
+          <span className="sidebar-user-role">{user.role}</span>
+        </span>
+      </button>
     </div>
   );
 }
