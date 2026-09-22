@@ -95,6 +95,8 @@ Das MVP (2.1) ist abgeschlossen. Bis 2026-09-18 wurde jede Erweiterung darüber 
 - **Sustainability-/Dead-Project-Score.** Rein aktivitätsbasiert, keine Bewertung von Codequalität oder "Wichtigkeit". Signal ist das tatsächliche letzte Commit-Datum des geklonten `HEAD` (`git log -1 --format=%cI`, direkt nach dem Clone gelesen — kostet keinen zusätzlichen Provider-API-Call und ist genauer als das Provider-`updated_at`, das auch bei Issues/Stars springt), gespeichert als `projects.last_commit_at`. Daraus wird serverseitig (`packages/shared`, `sustainabilityStatusFor`) ein Status abgeleitet: `active` (≤180 Tage), `aging` (≤365), `stale` (≤730), `dead` (>730), `unknown` (noch kein erfolgreicher Clone). Rein informativ und **nicht** Teil der Card-Farbe/Dringlichkeits-Sortierung (8.1 bleibt ausschließlich Severity-getrieben) — im Grid nur als neutrales Pill-Badge ab `stale`, in der Detailansicht (Overview) immer als Fakt "Last commit vor X" neben "Last scan". Details: 4 (Datenmodell), 5.1.
 - **Audit-Log.** Tabelle `audit_log` protokolliert sicherheitsrelevante, zustandsändernde Aktionen (Login/Login-Fehlschlag, Nutzer anlegen/Rolle ändern/löschen, Git-Account verbinden/reconnecten/löschen, Projekt importieren/löschen, Scan auslösen/abbrechen, Settings- und Notification-Channel-Änderungen) mit Akteur (`user_id` + Username-Snapshot, da der User später gelöscht sein kann), IP, Ressource und einem kleinen `meta`-JSON. Bewusst **nicht** protokolliert: Findings suppressen/unsuppressen (zu hochfrequent, kein Sicherheitswert) und reine GET-Requests. Kein automatisches Pruning in v1 — bei den in 1. beschriebenen Repo-Zahlen (5–50) bleibt die Tabelle klein; falls das je zum Problem wird, ist das ein neues, eigenes Ticket. Admin-only einsehbar unter `GET /api/audit-log`, paginiert. Details: 4, 6.2.
 - **Checksum-Verifikation der Scanner-Binaries.** Der Worker hasht `osv-scanner` und `trufflehog` beim Start (SHA-256, PATH-Auflösung in reinem JS, kein Subprozess) und vergleicht gegen in `apps/api/src/scanner/versions.ts` gepinnte Werte (`SCANNER_CHECKSUMS`, neben `SCANNER_VERSIONS`). Eine Abweichung vom gepinnten Wert lässt den Worker mit einer klaren Fehlermeldung beenden (fail-closed — dieselbe Härte wie der fehlende `APP_ENCRYPTION_KEY` in `config.ts`), da eine Abweichung ein Kompromittierungs-Indikator ist, kein normaler Betriebszustand (Bedrohungsmodell 6.1). Ist für eine Version (noch) kein Checksum gepinnt, läuft der Worker weiter, aber mit einer sichtbaren `WARNING`-Zeile im Log — **kein falsches Grün** (11.), das stille Fehlen einer Prüfung sieht anders aus als eine bestandene. `apps/api/src/scripts/print-scanner-checksums.ts` berechnet die aktuellen Hashes (z. B. per `docker run --rm --entrypoint node <image> api/dist/scripts/print-scanner-checksums.js`) im fertig gebauten Image, fertig zum Einfügen in `versions.ts` — dieser Schritt gehört in den Release-Prozess, sobald `SCANNER_VERSIONS`/das Dockerfile-Pinning sich ändert. Details: 6.2.
+- **Fleet-weite Paket-/Versions-Query (Incident-Response-Suche).** `GET /api/fleet/packages?name=&range=` (`apps/api/src/scan/fleet-query.ts`) beantwortet „welche Projekte haben Paket X (optional in Versions-Range Y) installiert" direkt aus dem jeweils letzten Scan mit Paket-Inventar pro Projekt — kein neuer Scan-Lauf, keine neue Abhängigkeit. Ein Projekt, dessen neuester Scan das Paket nicht mehr enthält, taucht nicht auf, auch wenn ein älterer Scan noch einen Treffer hatte. Versions-Range-Matching (`< 4.17.21`, `^2.0.0`, `>=1.0.0 <2.0.0`, …) über `matchesVersionRange` in `lib/semver.ts` (node-semver `satisfies`, `null` statt Raten bei nicht parsbarer Version/Range — dieselbe Regel wie `classifyUpdate` für Version Auditing, 5.3). UI: `CommandPalette.tsx`, eine ⌘K/Ctrl+K-Command-Palette, erreichbar über das globale Tastenkürzel oder die Such-Box im Dashboard-Header neben „Import project" — bewusst **kein** eigener Sidebar-Eintrag, siehe 8.1/8.5. Eine einzelne Eingabe wird clientseitig in Paketname + optionale Range gesplittet, sodass sich z. B. `lodash < 4.17.21` direkt aus einer Advisory einfügen lässt. Pro Treffer ein „Rescan now"-Trigger, da die Antwort nur so frisch wie der letzte Scan ist.
+- **Fleet-weite Trend-Charts (bewusst schmal, keine generische KPI-Seite).** Zwei Charts, kein Ausbau zu Scan-Dauer-Statistiken, Ecosystem-Verteilung o. ä.: Severity-Burndown fleet-weit und Verteilung der Sustainability-Status (2.2) über Zeit. Datengrundlage ist die neue Tabelle `fleet_snapshots` (4.) statt einer rückwirkenden Rekonstruktion aus `scans`/`vulnerabilities` — einmal täglich vom Worker-Poll-Loop befüllt (`apps/api/src/scan/fleet-snapshot.ts`, `captureDueFleetSnapshot`, aufgerufen aus `worker-loop.ts` im selben Takt wie der Schedule-Check, 0.1), ein Datenpunkt pro Kalendertag aus den bereits vorhandenen denormalisierten `projects`-Zählern bzw. `sustainabilityStatusFor()` aggregiert. Bewusst **keine** rückwirkende Rekonstruktion vor dem Feature-Release (11. „kein falsches Grün": eine frische Instanz zeigt ehrlich „not enough history yet", solange weniger als zwei Tagespunkte existieren, statt einer erfundenen Linie). `GET /api/fleet/trends?range=30d|90d|1y`. UI: `FleetTrends.tsx`, ein Modal wie Settings/Audit-Log, erreichbar ausschließlich über den „Open trends"-Link im Fleet-Pulse-Strip auf dem Dashboard (`FleetPulseStrip.tsx`, 8.5) — auch hier bewusst kein Sidebar-Eintrag. Bedient direkt das in Abschnitt 1 formulierte Wertversprechen („Zustandsverfolgung über die Zeit"), das vorher nur als Fakt pro Projekt (Overview-Tab), nicht aggregiert über Zeit sichtbar war.
 
 **Weiterhin offen** (kein Punkt hier braucht eine Einzelfreigabe mehr, aber auch keiner gilt als angefangen, bis tatsächlich daran gearbeitet wird):
 
@@ -104,8 +106,6 @@ Das MVP (2.1) ist abgeschlossen. Bis 2026-09-18 wurde jede Erweiterung darüber 
 - Incoming Webhooks / Event-getriebene Scan-Trigger, Tunneling
 - EPSS- und CISA-KEV-Anreicherung zur Priorisierung
 - KI-Layer: Triage-Assistent, Reachability-Einschätzung, Upgrade-Assistent — Leitplanken gelten bereits verbindlich, siehe Abschnitt 9
-- **Fleet-weite Paket-/Versions-Query (Incident-Response-Suche).** Strukturierte Suche über `packages` aller Projekte ("welche Repos haben `lodash < 4.17.21` installiert"), beantwortet direkt aus dem jeweils letzten Scan-Snapshot — kein neuer Scan-Lauf nötig, keine neue Abhängigkeit. Nutzt dieselbe ecosystem-spezifische Versions-Vergleichslogik wie Version Auditing (5.3). Ergänzend ein "jetzt neu scannen"-Trigger direkt aus dem Treffer, da die Antwort nur so frisch ist wie der letzte Scan. Motivation: Bei einer akuten Supply-Chain-Meldung ("Paket XY kompromittiert, betroffen sind alle Versionen < Y") sofort sehen, welche eigenen Projekte betroffen sind, ohne jedes Projekt einzeln zu öffnen — eine Abfrage, die sonst nur mit vollem SBOM-Unterbau geht, hier aber aus bereits vorhandenen Daten beantwortbar ist.
-- **Fleet-weite Trend-Charts (bewusst schmal, keine generische KPI-Seite).** 2–3 gezielte Zeitreihen-Diagramme statt einer offenen Analytics-Seite: Severity-Burndown fleet-weit und Verteilung der Sustainability-Status (2.2) über Zeit, basierend auf der historischen `scans`-Tabelle. Kein Ausbau zu Scan-Dauer-Statistiken, Ecosystem-Verteilung o. ä. — das wäre Bling ohne Alleinstellungsmerkmal. Bedient direkt das in Abschnitt 1 formulierte Wertversprechen ("Zustandsverfolgung über die Zeit"), das aktuell nur als Fakt pro Projekt (Overview-Tab), nicht aggregiert über Zeit sichtbar ist. Teilt sich die Zeitreihen-Query-Grundlage mit der Paket-Query oben — sinnvollerweise als ein gemeinsames Arbeitspaket umgesetzt, nicht als zwei getrennte Features.
 
 ---
 
@@ -239,6 +239,19 @@ audit_log
   resource_type (nullable), resource_id (nullable),
   meta (json, nullable — kleiner Kontext wie {fullName} oder {from, to}, nie Secrets/Tokens),
   created_at
+```
+
+```
+fleet_snapshots
+  id, date (text 'YYYY-MM-DD', UNIQUE — höchstens eine Zeile pro Kalendertag),
+  created_at,
+  count_vuln_critical, count_vuln_high, count_vuln_medium, count_vuln_low,
+  count_sustain_active, count_sustain_aging, count_sustain_stale,
+  count_sustain_dead, count_sustain_unknown
+  -- Ein Datenpunkt pro Kalendertag für die Fleet-Trend-Charts (2.2, 8.5):
+  -- aggregiert die bereits vorhandenen projects-Zähler bzw.
+  -- sustainabilityStatusFor(), einmal täglich vom Worker geschrieben
+  -- (scan/fleet-snapshot.ts). Kein Backfill vor dem Feature-Release.
 ```
 
 ### 4.1 Fingerprints und Reconciliation
@@ -415,11 +428,14 @@ Ziel ist ein cleanes, Notion-artiges Erscheinungsbild — kein dichtes Enterpris
 - **Reduziertes Chrome.** Keine unnötigen Icons, Badges oder Deko-Elemente. Jedes UI-Element muss eine Funktion haben — Content und Daten stehen im Vordergrund, nicht die Oberfläche selbst.
 - **Moderate, konsistente Eckenradien** auf Cards, Buttons und Inputs — weder scharfkantig noch stark abgerundet.
 
+**Navigation.** Eine linke Sidebar (220px, `position: sticky` auf Bildschirmhöhe fixiert, scrollt nicht mit dem Seiteninhalt mit) ist die einzige permanente Navigations-Chrome der App: Logo, darunter Dashboard/Settings/Audit-log (letzteres nur für `admin`) als Nav-Einträge, unten der Account-Bereich (Theme-Umschalter, Sign-out). Bewusst **kein** Sidebar-Eintrag für Fleet-Suche oder -Trends (8.5) — beide sind Werkzeuge für den Ausnahmefall, nicht Teil der täglichen Navigation.
+
 Diese Richtlinien gelten für alle Ansichten (Dashboard, Detailseite, Setup-Wizard), nicht nur für die Startseite. Bei Rückfragen zur konkreten Umsetzung gilt: eher an Notion, Linear oder Vercel-Dashboard orientieren als an klassischen Security-Tools wie DefectDojo oder Dependency-Track.
 
 ### 8.1 Dashboard (Startseite)
 
-- Header mit **Import project**-Button und globalem Zustand (`X projects · last scan 3 minutes ago`)
+- Header mit einer Such-Box („Search packages…", öffnet die ⌘K-Command-Palette, 8.5) neben dem **Import project**-Button, plus globalem Zustand (`X projects · last scan 3 minutes ago`)
+- Direkt darunter der Fleet-Pulse-Strip (8.5) — nur sichtbar, sobald mindestens ein Projekt importiert ist
 - Projekt-Cards in einem responsiven Grid
 - Import-Dialog: listet die Repos des verbundenen Accounts (paginiert, durchsuchbar, GitHub-API `/user/repos`), Mehrfachauswahl möglich, bereits importierte Repos werden aus der Liste ausgeblendet
 - Beim Import wird sofort ein erster Scan eingereiht; die Card erscheint direkt im Zustand `scanning`
@@ -466,6 +482,16 @@ Jedes Finding beantwortet drei Fragen ohne Klick: **Was ist das? Wie schlimm ist
 ### 8.4 Caching-Strategie (React Query)
 
 Query-Keys folgen der Ressourcen-Hierarchie: `['projects']` für die Grid-Ansicht, `['project', projectId]` für die Detailansicht samt Dependencies/Secrets. Import, Löschen und manuelles Anstoßen eines Scans invalidieren `['projects']`; ein SSE-Event (siehe 3.5) invalidiert gezielt nur `['project', projectId]` des betroffenen Projekts — kein globaler Refetch bei jeder Statusänderung. `staleTime` für die Grid-Ansicht großzügig (z. B. 30s), da sich die Zähler ohnehin über SSE aktualisieren und nicht bei jedem Tab-Fokus neu geladen werden müssen.
+
+### 8.5 Fleet-weite Suche & Trends
+
+Die beiden in 2.2 beschriebenen fleet-weiten Features, bewusst ohne eigenen Sidebar-Eintrag (8.0) — beide sind Werkzeuge für den Ausnahmefall (Incident-Response-Suche, „wie entwickelt sich das insgesamt"), nicht Teil der täglichen Navigation.
+
+**Suche (`CommandPalette.tsx`).** Erreichbar über ⌘K/Ctrl+K (global, `App.tsx`) oder die Such-Box im Dashboard-Header (8.1). Eine einzelne Eingabe wird clientseitig am ersten Leerzeichen in Paketname + optionale Versions-Range gesplittet, damit sich z. B. `lodash < 4.17.21` direkt aus einer Advisory einfügen lässt. Ergebnisliste pro Treffer: Projektname, Ecosystem, installierte Version, direkt/transitiv, „Rescan now". Debounced (250ms), aktiv ab zwei eingegebenen Zeichen. Schließt sich per Escape oder Klick auf den Backdrop, wie jeder andere Dialog in der App.
+
+**Fleet-Pulse-Strip (`FleetPulseStrip.tsx`, auf dem Dashboard).** Zwei Hälften, exakt 50/50 der Breite: links Finding-Zähler + Sparkline (live aus den ohnehin schon geladenen `projects`-Zählern berechnet, keine zusätzliche Anfrage nötig) sowie die Sustainability-Verteilung als Balken (ebenfalls live, aus `sustainabilityStatusFor()`, 2.2) — der Balken wächst mit der verfügbaren Breite, damit er nicht gestaucht wirkt. Rechts der Link „Open trends" → öffnet `FleetTrends.tsx`. Nur die Sparkline-Kurve selbst braucht Historie (`GET /api/fleet/trends?range=30d`); Zähler und Sustainability-Balken sind immer aktuell, unabhängig davon, wie viele Tages-Snapshots schon existieren.
+
+**Trends-Modal (`FleetTrends.tsx`).** Öffnet wie Settings/Audit-Log als Modal über dem Dashboard, nicht als eigene Seite. Zwei Charts (Severity-Burndown, Sustainability-Distribution) über einen wählbaren Zeitraum (30d/90d/1y), als gestapelte SVG-Flächen ohne Chart-Library gebaut (`lib/stacked-area.ts`) — bewusst kein neuer Frontend-Dependency für zwei Charts. Datengrundlage: `fleet_snapshots` (4.). Bei weniger als zwei vorhandenen Tagespunkten — z. B. direkt nach dem Update auf diese Version — zeigen sowohl der Sparkline-Bereich im Pulse-Strip als auch das Modal explizit „Collecting trend data…" / „Not enough history yet" statt einer irreführenden flachen oder erfundenen Linie (11. „kein falsches Grün").
 
 ---
 

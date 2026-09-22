@@ -19,6 +19,8 @@ One `docker compose up -d`, one browser tab — and for every repository you car
 - 📦 **Outdated packages** — installed vs. latest registry version, classified as patch / minor / major
 - 🔑 **Leaked secrets** — working tree _and_ full git history scanned with [TruffleHog](https://github.com/trufflesecurity/trufflehog), including live verification of found credentials
 - 🌱 **Project health** — declared package licenses and a commit-activity-based sustainability signal (`active` → `dead`)
+- 🔍 **Fleet-wide search** — find every project with a given package/version installed (e.g. `lodash < 4.17.21`) via ⌘K, answered straight from each project's last scan — no new scan triggered, with a one-click rescan right from the result
+- 📈 **Fleet trends** — two focused charts, not a KPI dashboard: severity burndown and sustainability status across every project over time
 - 🔔 **Notifications & scheduling** — Discord, Slack and generic webhook channels, plus a shared cron window for automatic scans
 - 👥 **Multiple accounts, multiple users** — GitHub, GitLab and Gitea (including self-hosted instances), several accounts side by side; multiple named users per instance with `admin`/`member` roles
 - 📜 **Audit log** — every security-relevant action (logins, account changes, imports, scans) recorded and admin-viewable
