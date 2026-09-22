@@ -31,6 +31,10 @@ const connectSchema = z.object({
   provider: z.enum(['github', 'gitlab', 'gitea']),
   token: z.string().trim().min(1, 'Token must not be empty'),
   baseUrl: z.string().trim().url().optional(),
+  // Distinguishes two accounts that share a username — provider token
+  // validation reports the token holder's own login, not the resource owner
+  // the token is scoped to (see findMatchingAccount).
+  label: z.string().trim().max(100).optional(),
 });
 
 const reconnectSchema = z.object({
@@ -114,12 +118,16 @@ export function registerGitAccountRoutes(app: FastifyInstance): void {
       const baseUrl = provider.supportsCustomBaseUrl ? normalizeBaseUrl(input.baseUrl) : null;
 
       const account = await provider.validateToken(input.token, baseUrl ?? undefined).catch(toApiError);
+      const label = input.label && input.label.length > 0 ? input.label : null;
 
-      const existing = findMatchingAccount(input.provider, baseUrl, account.username);
+      const existing = findMatchingAccount(input.provider, baseUrl, account.username, label);
       if (existing) {
         throw conflict(
           'GIT_ACCOUNT_ALREADY_CONNECTED',
-          `${account.username} on ${provider.label} is already connected`,
+          label
+            ? `${account.username} (${label}) on ${provider.label} is already connected`
+            : `${account.username} on ${provider.label} is already connected. If this token ` +
+                `is scoped to a different organization, give it a label to tell the two apart.`,
         );
       }
 
@@ -127,6 +135,7 @@ export function registerGitAccountRoutes(app: FastifyInstance): void {
         provider: input.provider,
         baseUrl,
         username: account.username,
+        label,
         token: input.token,
         scopes: account.scopes,
       });
@@ -135,7 +144,7 @@ export function registerGitAccountRoutes(app: FastifyInstance): void {
         action: 'git_account.connect',
         resourceType: 'git_account',
         resourceId: saved.id,
-        meta: { provider: input.provider, username: account.username },
+        meta: { provider: input.provider, username: account.username, label },
       });
       return reply.status(201).send({
         account: toPublicAccount(saved),

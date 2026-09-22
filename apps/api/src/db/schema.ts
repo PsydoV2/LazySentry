@@ -41,6 +41,11 @@ export const gitAccounts = sqliteTable('git_accounts', {
   // the same provider — are supported side by side.
   baseUrl: text('base_url'),
   username: text('username').notNull(),
+  // User-supplied, e.g. "Org: Faltix IT UG" — distinguishes two accounts
+  // that share a username because a provider PAT (GitHub fine-grained PATs
+  // in particular) reports the token holder's own login regardless of which
+  // resource owner the token is actually scoped to.
+  label: text('label'),
   tokenEncrypted: text('token_encrypted').notNull(),
   tokenScopes: text('token_scopes', { mode: 'json' }).$type<string[]>(),
   // 'valid' | 'invalid' — set to 'invalid' when a clone fails with 401/403

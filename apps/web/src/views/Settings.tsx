@@ -645,7 +645,7 @@ function AccountRow({
         <span className="row">
           <ProviderIcon provider={account.provider} />
           <span className="stack" style={{ gap: 2 }}>
-            <strong>{account.username}</strong>
+            <strong>{account.label ? `${account.label} (${account.username})` : account.username}</strong>
             <span className="subtle">
               {account.baseUrl ? `${account.baseUrl} · ` : ''}
               {account.scopes.length > 0 ? account.scopes.join(', ') : 'scopes unknown'} ·

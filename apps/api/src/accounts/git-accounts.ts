@@ -20,6 +20,7 @@ export interface PublicGitAccount {
   provider: string;
   baseUrl: string | null;
   username: string;
+  label: string | null;
   scopes: string[];
   status: string;
   connectedAt: number;
@@ -32,6 +33,7 @@ export function toPublicAccount(account: GitAccount): PublicGitAccount {
     provider: account.provider,
     baseUrl: account.baseUrl,
     username: account.username,
+    label: account.label,
     scopes: account.tokenScopes ?? [],
     status: account.status,
     connectedAt: account.connectedAt.getTime(),
@@ -47,24 +49,34 @@ export function getGitAccountById(id: number): GitAccount | undefined {
   return db.select().from(gitAccounts).where(eq(gitAccounts.id, id)).get();
 }
 
-/** Same (provider, base URL, username) already connected — a 409, not a duplicate row. */
+/**
+ * Same (provider, base URL, username, label) already connected — a 409, not
+ * a duplicate row. `label` is part of the key because a provider's token
+ * validation reports the token holder's own login, not which resource owner
+ * the token is actually scoped to (e.g. a GitHub fine-grained PAT scoped to
+ * an organization still reports the user's personal login via `/user`) — so
+ * two genuinely different connections for the same user are only
+ * distinguishable by the label the person gives them.
+ */
 export function findMatchingAccount(
   provider: ProviderId,
   baseUrl: string | null,
   username: string,
+  label: string | null,
 ): GitAccount | undefined {
   return db
     .select()
     .from(gitAccounts)
     .where(and(eq(gitAccounts.provider, provider), eq(gitAccounts.username, username)))
     .all()
-    .find((row) => row.baseUrl === baseUrl);
+    .find((row) => row.baseUrl === baseUrl && row.label === label);
 }
 
 export function createGitAccount(input: {
   provider: ProviderId;
   baseUrl: string | null;
   username: string;
+  label: string | null;
   token: string;
   scopes: string[];
 }): GitAccount {
@@ -75,6 +87,7 @@ export function createGitAccount(input: {
       provider: input.provider,
       baseUrl: input.baseUrl,
       username: input.username,
+      label: input.label,
       tokenEncrypted: encrypt(input.token, config.encryptionKey),
       tokenScopes: input.scopes,
       status: 'valid',

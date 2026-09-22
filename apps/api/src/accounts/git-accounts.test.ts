@@ -40,6 +40,7 @@ function connect(overrides: Partial<Parameters<typeof createGitAccount>[0]> = {}
     provider: 'github',
     baseUrl: null,
     username: 'octocat',
+    label: null,
     token: 'secret-token',
     scopes: [],
     ...overrides,
@@ -74,10 +75,22 @@ describe('findMatchingAccount', () => {
     connect({ provider: 'gitlab', baseUrl: 'https://gitlab.example.com', username: 'me' });
 
     expect(
-      findMatchingAccount('gitlab', 'https://gitlab.example.com', 'me'),
+      findMatchingAccount('gitlab', 'https://gitlab.example.com', 'me', null),
     ).toBeDefined();
-    expect(findMatchingAccount('gitlab', null, 'me')).toBeUndefined();
-    expect(findMatchingAccount('github', null, 'me')).toBeUndefined();
+    expect(findMatchingAccount('gitlab', null, 'me', null)).toBeUndefined();
+    expect(findMatchingAccount('github', null, 'me', null)).toBeUndefined();
+  });
+
+  it('treats a labelled connection as distinct from an unlabelled one with the same username', () => {
+    // Mirrors a GitHub fine-grained PAT scoped to an organization: the API
+    // still reports the personal login, so only the label tells them apart.
+    connect({ username: 'me', label: null });
+    connect({ username: 'me', label: 'Org: Acme' });
+
+    expect(findMatchingAccount('github', null, 'me', null)).toBeDefined();
+    expect(findMatchingAccount('github', null, 'me', 'Org: Acme')).toBeDefined();
+    expect(findMatchingAccount('github', null, 'me', 'Org: Other')).toBeUndefined();
+    expect(listGitAccounts()).toHaveLength(2);
   });
 });
 
