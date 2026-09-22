@@ -54,6 +54,7 @@ export function ConnectGitAccount({ onConnected, submitLabel = 'Connect', fixedP
   const [provider, setProvider] = useState<GitProviderId>(fixedProvider ?? 'github');
   const [token, setToken] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
+  const [label, setLabel] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -74,8 +75,10 @@ export function ConnectGitAccount({ onConnected, submitLabel = 'Connect', fixedP
         provider,
         token,
         ...(info?.supportsCustomBaseUrl && baseUrl.trim() ? { baseUrl: baseUrl.trim() } : {}),
+        ...(label.trim() ? { label: label.trim() } : {}),
       });
       setToken('');
+      setLabel('');
       onConnected(result);
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'Could not connect');
@@ -139,6 +142,24 @@ export function ConnectGitAccount({ onConnected, submitLabel = 'Connect', fixedP
           )}{' '}
           with only <strong>{hint.scopes}</strong>. The token is encrypted before
           it is stored and never leaves this server.
+        </p>
+      </div>
+
+      <div>
+        <label htmlFor="label">Label (optional)</label>
+        <input
+          id="label"
+          type="text"
+          value={label}
+          placeholder="e.g. Org: Faltix IT UG"
+          onChange={(event) => setLabel(event.target.value)}
+        />
+        <p className="field-hint">
+          Only needed to tell two accounts apart when they report the same
+          username — for example a GitHub personal token and a fine-grained
+          token scoped to an organization as its resource owner. GitHub does
+          not report which resource owner a token is scoped to, so without a
+          label the second connection looks like a duplicate.
         </p>
       </div>
 

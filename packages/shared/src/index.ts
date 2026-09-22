@@ -170,6 +170,8 @@ export interface GitAccount {
   /** Set only for a self-hosted instance (e.g. a private GitLab). */
   baseUrl: string | null;
   username: string;
+  /** User-supplied, distinguishes two accounts that share a username (6.2). */
+  label: string | null;
   scopes: string[];
   /** 'valid' | 'invalid' — invalid asks the UI for a reconnect (6.2). */
   status: string;
