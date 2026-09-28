@@ -172,6 +172,8 @@ export interface GitAccount {
   username: string;
   /** User-supplied, distinguishes two accounts that share a username (6.2). */
   label: string | null;
+  /** When set, repository listing/import for this account is filtered to repos owned by this login. */
+  repoOwner: string | null;
   scopes: string[];
   /** 'valid' | 'invalid' — invalid asks the UI for a reconnect (6.2). */
   status: string;
@@ -578,6 +580,7 @@ export const AUDIT_LOG_ACTIONS = [
   'user.delete',
   'git_account.connect',
   'git_account.reconnect',
+  'git_account.update',
   'git_account.delete',
   'project.import',
   'project.delete',

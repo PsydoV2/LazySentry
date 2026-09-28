@@ -1,13 +1,13 @@
-import { useEffect, useState, type FormEvent } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Select } from './Select';
+import { useEffect, useState, type FormEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Select } from "./Select";
 import {
   api,
   ApiError,
   type ConnectResult,
   type GitProviderId,
   type ProvidersList,
-} from '../lib/api';
+} from "../lib/api";
 
 interface Props {
   onConnected: (result: ConnectResult) => void;
@@ -16,28 +16,31 @@ interface Props {
   fixedProvider?: GitProviderId;
 }
 
-const SCOPE_HINTS: Record<GitProviderId, { url: string; label: string; scopes: string }> = {
+const SCOPE_HINTS: Record<
+  GitProviderId,
+  { url: string; label: string; scopes: string }
+> = {
   github: {
-    url: 'https://github.com/settings/personal-access-tokens',
-    label: 'fine-grained token',
-    scopes: 'Contents: read and Metadata: read',
+    url: "https://github.com/settings/personal-access-tokens",
+    label: "fine-grained token",
+    scopes: "Contents: read and Metadata: read",
   },
   gitlab: {
-    url: 'https://gitlab.com/-/user_settings/personal_access_tokens',
-    label: 'personal access token',
-    scopes: 'read_api and read_repository',
+    url: "https://gitlab.com/-/user_settings/personal_access_tokens",
+    label: "personal access token",
+    scopes: "read_api and read_repository",
   },
   gitea: {
-    url: '', // Self-hosted, no fixed URL — see the instance-URL hint instead.
-    label: 'access token',
-    scopes: 'read:repository',
+    url: "", // Self-hosted, no fixed URL — see the instance-URL hint instead.
+    label: "access token",
+    scopes: "read:repository",
   },
 };
 
 const TOKEN_PLACEHOLDER: Record<GitProviderId, string> = {
-  github: 'github_pat_…',
-  gitlab: 'glpat-…',
-  gitea: '',
+  github: "github_pat_…",
+  gitlab: "glpat-…",
+  gitea: "",
 };
 
 /**
@@ -45,16 +48,23 @@ const TOKEN_PLACEHOLDER: Record<GitProviderId, string> = {
  * can be connected side by side, including several for the same provider —
  * this form always creates a new connection rather than replacing one.
  */
-export function ConnectGitAccount({ onConnected, submitLabel = 'Connect', fixedProvider }: Props) {
+export function ConnectGitAccount({
+  onConnected,
+  submitLabel = "Connect",
+  fixedProvider,
+}: Props) {
   const providers = useQuery({
-    queryKey: ['providers'],
-    queryFn: () => api.get<ProvidersList>('/api/providers'),
+    queryKey: ["providers"],
+    queryFn: () => api.get<ProvidersList>("/api/providers"),
   });
 
-  const [provider, setProvider] = useState<GitProviderId>(fixedProvider ?? 'github');
-  const [token, setToken] = useState('');
-  const [baseUrl, setBaseUrl] = useState('');
-  const [label, setLabel] = useState('');
+  const [provider, setProvider] = useState<GitProviderId>(
+    fixedProvider ?? "github",
+  );
+  const [token, setToken] = useState("");
+  const [baseUrl, setBaseUrl] = useState("");
+  const [label, setLabel] = useState("");
+  const [repoOwner, setRepoOwner] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -63,7 +73,7 @@ export function ConnectGitAccount({ onConnected, submitLabel = 'Connect', fixedP
   // Reset the base-url field whenever the provider changes, so switching
   // from GitLab back to GitHub does not carry over a stray self-hosted URL.
   useEffect(() => {
-    setBaseUrl('');
+    setBaseUrl("");
   }, [provider]);
 
   async function handleSubmit(event: FormEvent) {
@@ -71,17 +81,23 @@ export function ConnectGitAccount({ onConnected, submitLabel = 'Connect', fixedP
     setError(null);
     setBusy(true);
     try {
-      const result = await api.post<ConnectResult>('/api/git-accounts', {
+      const result = await api.post<ConnectResult>("/api/git-accounts", {
         provider,
         token,
-        ...(info?.supportsCustomBaseUrl && baseUrl.trim() ? { baseUrl: baseUrl.trim() } : {}),
+        ...(info?.supportsCustomBaseUrl && baseUrl.trim()
+          ? { baseUrl: baseUrl.trim() }
+          : {}),
         ...(label.trim() ? { label: label.trim() } : {}),
+        ...(repoOwner.trim() ? { repoOwner: repoOwner.trim() } : {}),
       });
-      setToken('');
-      setLabel('');
+      setToken("");
+      setLabel("");
+      setRepoOwner("");
       onConnected(result);
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'Could not connect');
+      setError(
+        caught instanceof ApiError ? caught.message : "Could not connect",
+      );
     } finally {
       setBusy(false);
     }
@@ -97,7 +113,10 @@ export function ConnectGitAccount({ onConnected, submitLabel = 'Connect', fixedP
           <Select
             id="provider"
             value={provider}
-            options={(providers.data?.providers ?? []).map((p) => ({ value: p.id, label: p.label }))}
+            options={(providers.data?.providers ?? []).map((p) => ({
+              value: p.id,
+              label: p.label,
+            }))}
             onChange={setProvider}
           />
         </div>
@@ -110,12 +129,16 @@ export function ConnectGitAccount({ onConnected, submitLabel = 'Connect', fixedP
             id="base-url"
             type="text"
             value={baseUrl}
-            placeholder={info.baseUrlRequired ? 'https://gitea.example.com' : info.defaultBaseUrl}
+            placeholder={
+              info.baseUrlRequired
+                ? "https://gitea.example.com"
+                : info.defaultBaseUrl
+            }
             onChange={(event) => setBaseUrl(event.target.value)}
           />
           <p className="field-hint">
             {info.baseUrlRequired
-              ? 'Required — the URL of your self-hosted instance.'
+              ? "Required — the URL of your self-hosted instance."
               : `Leave empty for ${info.defaultBaseUrl}.`}
           </p>
         </div>
@@ -132,16 +155,16 @@ export function ConnectGitAccount({ onConnected, submitLabel = 'Connect', fixedP
           onChange={(event) => setToken(event.target.value)}
         />
         <p className="field-hint">
-          Use a{' '}
+          Use a{" "}
           {hint.url ? (
             <a href={hint.url} target="_blank" rel="noreferrer noopener">
               {hint.label}
             </a>
           ) : (
             hint.label
-          )}{' '}
-          with only <strong>{hint.scopes}</strong>. The token is encrypted before
-          it is stored and never leaves this server.
+          )}{" "}
+          with only <strong>{hint.scopes}</strong>. The token is encrypted
+          before it is stored and never leaves this server.
         </p>
       </div>
 
@@ -151,17 +174,36 @@ export function ConnectGitAccount({ onConnected, submitLabel = 'Connect', fixedP
           id="label"
           type="text"
           value={label}
-          placeholder="e.g. Org: Faltix IT UG"
+          placeholder="e.g. Org: Soft IT UG"
           onChange={(event) => setLabel(event.target.value)}
         />
         <p className="field-hint">
           Only needed to tell two accounts apart when they report the same
           username — for example a GitHub personal token and a fine-grained
-          token scoped to an organization as its resource owner. GitHub does
-          not report which resource owner a token is scoped to, so without a
-          label the second connection looks like a duplicate.
+          token scoped to an organization as its resource owner. GitHub does not
+          report which resource owner a token is scoped to, so without a label
+          the second connection looks like a duplicate.
         </p>
       </div>
+
+      {provider === "github" && (
+        <div>
+          <label htmlFor="repo-owner">Only show repos owned by (optional)</label>
+          <input
+            id="repo-owner"
+            type="text"
+            value={repoOwner}
+            placeholder="e.g. your-org-slug"
+            onChange={(event) => setRepoOwner(event.target.value)}
+          />
+          <p className="field-hint">
+            Set this for a token scoped to an organization. GitHub's repository
+            list can still include your own public repos even when the token's
+            resource owner is set to an org — this filters the import list down
+            to repos owned by the login you enter here.
+          </p>
+        </div>
+      )}
 
       {error && <p className="notice notice-error">{error}</p>}
 
@@ -170,10 +212,12 @@ export function ConnectGitAccount({ onConnected, submitLabel = 'Connect', fixedP
           type="submit"
           className="btn-primary"
           disabled={
-            busy || token.trim() === '' || (info?.baseUrlRequired && baseUrl.trim() === '')
+            busy ||
+            token.trim() === "" ||
+            (info?.baseUrlRequired && baseUrl.trim() === "")
           }
         >
-          {busy ? 'Checking…' : submitLabel}
+          {busy ? "Checking…" : submitLabel}
         </button>
       </div>
     </form>
@@ -188,7 +232,7 @@ export function ReconnectAccount({
   accountId: number;
   onConnected: (result: ConnectResult) => void;
 }) {
-  const [token, setToken] = useState('');
+  const [token, setToken] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -201,10 +245,12 @@ export function ReconnectAccount({
         `/api/git-accounts/${accountId}/reconnect`,
         { token },
       );
-      setToken('');
+      setToken("");
       onConnected(result);
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'Could not reconnect');
+      setError(
+        caught instanceof ApiError ? caught.message : "Could not reconnect",
+      );
     } finally {
       setBusy(false);
     }
@@ -213,7 +259,9 @@ export function ReconnectAccount({
   return (
     <form className="stack" onSubmit={handleSubmit}>
       <div>
-        <label htmlFor={`reconnect-token-${accountId}`}>New personal access token</label>
+        <label htmlFor={`reconnect-token-${accountId}`}>
+          New personal access token
+        </label>
         <input
           id={`reconnect-token-${accountId}`}
           type="password"
@@ -224,8 +272,12 @@ export function ReconnectAccount({
       </div>
       {error && <p className="notice notice-error">{error}</p>}
       <div className="row">
-        <button type="submit" className="btn-primary" disabled={busy || token.trim() === ''}>
-          {busy ? 'Checking…' : 'Reconnect'}
+        <button
+          type="submit"
+          className="btn-primary"
+          disabled={busy || token.trim() === ""}
+        >
+          {busy ? "Checking…" : "Reconnect"}
         </button>
       </div>
     </form>
@@ -237,7 +289,7 @@ export function TokenScopeWarning({ result }: { result: ConnectResult }) {
   if (result.writeScopes.length > 0) {
     return (
       <p className="notice notice-warning">
-        This token has write access ({result.writeScopes.join(', ')}).
+        This token has write access ({result.writeScopes.join(", ")}).
         LazySentry only ever reads. Consider replacing it with a read-only
         token.
       </p>
@@ -246,8 +298,8 @@ export function TokenScopeWarning({ result }: { result: ConnectResult }) {
   if (result.scopesUnknown) {
     return (
       <p className="notice notice-info">
-        The provider does not report this token's permissions, so they could
-        not be verified here. Double-check that it grants read access only.
+        The provider does not report this token's permissions, so they could not
+        be verified here. Double-check that it grants read access only.
       </p>
     );
   }

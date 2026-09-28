@@ -41,11 +41,19 @@ export const gitAccounts = sqliteTable('git_accounts', {
   // the same provider — are supported side by side.
   baseUrl: text('base_url'),
   username: text('username').notNull(),
-  // User-supplied, e.g. "Org: Faltix IT UG" — distinguishes two accounts
+  // User-supplied, e.g. "Org: Soft IT UG" — distinguishes two accounts
   // that share a username because a provider PAT (GitHub fine-grained PATs
   // in particular) reports the token holder's own login regardless of which
   // resource owner the token is actually scoped to.
   label: text('label'),
+  // User-supplied, e.g. "acme-corp" — when set, repository listing and
+  // import for this account are filtered to repos owned by this login.
+  // Needed because GitHub's `/user/repos` can include the token holder's
+  // own public repos via the `owner` affiliation even when the token is a
+  // fine-grained PAT whose resource owner is set to an organization — the
+  // endpoint's affiliation filter is keyed off the authenticated identity,
+  // not the token's resource-owner restriction.
+  repoOwner: text('repo_owner'),
   tokenEncrypted: text('token_encrypted').notNull(),
   tokenScopes: text('token_scopes', { mode: 'json' }).$type<string[]>(),
   // 'valid' | 'invalid' — set to 'invalid' when a clone fails with 401/403

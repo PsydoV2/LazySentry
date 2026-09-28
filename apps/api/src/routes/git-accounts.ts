@@ -17,6 +17,7 @@ import {
   markAccountValid,
   reconnectGitAccount,
   toPublicAccount,
+  updateGitAccount,
 } from '../accounts/git-accounts.js';
 import { requireAuth, requireRole, requireSameOrigin } from '../auth/session.js';
 import { db } from '../db/client.js';
@@ -35,10 +36,20 @@ const connectSchema = z.object({
   // validation reports the token holder's own login, not the resource owner
   // the token is scoped to (see findMatchingAccount).
   label: z.string().trim().max(100).optional(),
+  // When set, repository listing/import for this account is filtered to
+  // repos owned by this login — a client-side safety net because a
+  // fine-grained PAT scoped to an org can still surface the token holder's
+  // own public repos via `/user/repos` (see schema.ts on gitAccounts.repoOwner).
+  repoOwner: z.string().trim().max(100).optional(),
 });
 
 const reconnectSchema = z.object({
   token: z.string().trim().min(1, 'Token must not be empty'),
+});
+
+const updateSchema = z.object({
+  label: z.string().trim().max(100).optional(),
+  repoOwner: z.string().trim().max(100).optional(),
 });
 
 const listQuerySchema = z.object({
@@ -75,6 +86,12 @@ function requireAccount(id: number) {
   const account = getGitAccountById(id);
   if (!account) throw notFound('Git account not found');
   return account;
+}
+
+/** True when `repo` is owned by `owner` (the part of `fullName` before the `/`). */
+function ownedBy(repo: { fullName: string }, owner: string): boolean {
+  const [repoOwner] = repo.fullName.split('/');
+  return repoOwner?.toLowerCase() === owner.toLowerCase();
 }
 
 export function registerGitAccountRoutes(app: FastifyInstance): void {
@@ -119,6 +136,7 @@ export function registerGitAccountRoutes(app: FastifyInstance): void {
 
       const account = await provider.validateToken(input.token, baseUrl ?? undefined).catch(toApiError);
       const label = input.label && input.label.length > 0 ? input.label : null;
+      const repoOwner = input.repoOwner && input.repoOwner.length > 0 ? input.repoOwner : null;
 
       const existing = findMatchingAccount(input.provider, baseUrl, account.username, label);
       if (existing) {
@@ -136,6 +154,7 @@ export function registerGitAccountRoutes(app: FastifyInstance): void {
         baseUrl,
         username: account.username,
         label,
+        repoOwner,
         token: input.token,
         scopes: account.scopes,
       });
@@ -198,6 +217,28 @@ export function registerGitAccountRoutes(app: FastifyInstance): void {
       });
     },
   );
+
+  /** Edits label / repo-owner filter without touching the stored token. */
+  app.patch('/api/git-accounts/:id', async (request, reply) => {
+    requireRole(request, 'admin');
+    requireSameOrigin(request);
+    const { id } = z.object({ id: z.coerce.number().int() }).parse(request.params);
+    requireAccount(id);
+    const input = updateSchema.parse(request.body);
+
+    const saved = updateGitAccount(id, {
+      label: input.label && input.label.length > 0 ? input.label : null,
+      repoOwner: input.repoOwner && input.repoOwner.length > 0 ? input.repoOwner : null,
+    });
+
+    recordAuditLog(request, {
+      action: 'git_account.update',
+      resourceType: 'git_account',
+      resourceId: id,
+      meta: { label: saved.label, repoOwner: saved.repoOwner },
+    });
+    return reply.status(200).send({ account: toPublicAccount(saved) });
+  });
 
   app.delete('/api/git-accounts/:id', async (request, reply) => {
     requireRole(request, 'admin');
@@ -272,6 +313,7 @@ export function registerGitAccountRoutes(app: FastifyInstance): void {
       const matched = all.filter(
         (repo) =>
           !importedIds.has(repo.providerRepoId) &&
+          (!account.repoOwner || ownedBy(repo, account.repoOwner)) &&
           (!search || repo.fullName.toLowerCase().includes(search)),
       );
       const start = (query.page - 1) * query.perPage;
@@ -323,7 +365,12 @@ export function registerGitAccountRoutes(app: FastifyInstance): void {
         for (let page = 1; page <= 20 && found.size < wanted.size; page++) {
           const result = await provider.listRepositories(token, { page, perPage: 100 }, baseUrl);
           for (const repo of result.repositories) {
-            if (wanted.has(repo.providerRepoId)) found.set(repo.providerRepoId, repo);
+            if (
+              wanted.has(repo.providerRepoId) &&
+              (!account.repoOwner || ownedBy(repo, account.repoOwner))
+            ) {
+              found.set(repo.providerRepoId, repo);
+            }
           }
           if (!result.hasMore) break;
         }

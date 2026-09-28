@@ -19,6 +19,7 @@ const {
   getAccountToken,
   listGitAccounts,
   reconnectGitAccount,
+  updateGitAccount,
 } = await import('./git-accounts.js');
 
 beforeAll(() => {
@@ -41,6 +42,7 @@ function connect(overrides: Partial<Parameters<typeof createGitAccount>[0]> = {}
     baseUrl: null,
     username: 'octocat',
     label: null,
+    repoOwner: null,
     token: 'secret-token',
     scopes: [],
     ...overrides,
@@ -107,6 +109,21 @@ describe('reconnectGitAccount', () => {
     expect(reconnected.status).toBe('valid');
     expect(getAccountToken(reconnected)).toBe('new-token');
     expect(listGitAccounts()).toHaveLength(1);
+  });
+});
+
+describe('updateGitAccount', () => {
+  it('sets the owner filter without touching the token', () => {
+    const account = connect({ label: null, repoOwner: null });
+
+    const updated = updateGitAccount(account.id, {
+      label: 'Org: Acme',
+      repoOwner: 'acme-corp',
+    });
+
+    expect(updated.label).toBe('Org: Acme');
+    expect(updated.repoOwner).toBe('acme-corp');
+    expect(getAccountToken(updated)).toBe('secret-token');
   });
 });
 

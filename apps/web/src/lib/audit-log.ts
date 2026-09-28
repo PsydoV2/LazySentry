@@ -13,6 +13,7 @@ const ACTION_LABEL: Record<AuditLogAction, string> = {
   'user.delete': 'Deleted user',
   'git_account.connect': 'Connected git account',
   'git_account.reconnect': 'Reconnected git account',
+  'git_account.update': 'Edited git account',
   'git_account.delete': 'Removed git account',
   'project.import': 'Imported project',
   'project.delete': 'Deleted project',
@@ -95,6 +96,8 @@ export function auditLogDetail(entry: AuditLogEntry): string | null {
       return typeof meta.username === 'string'
         ? `${meta.username}${meta.provider ? ` (${meta.provider})` : ''}`
         : null;
+    case 'git_account.update':
+      return typeof meta.label === 'string' ? meta.label : null;
     case 'project.import':
     case 'project.delete':
       return typeof meta.fullName === 'string' ? meta.fullName : null;

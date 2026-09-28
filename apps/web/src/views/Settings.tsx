@@ -13,6 +13,7 @@ import {
   IconBell,
   IconClock,
   IconDiscord,
+  IconFilter,
   IconGitea,
   IconGithub,
   IconGitlab,
@@ -630,11 +631,26 @@ function AccountRow({
   const [reconnecting, setReconnecting] = useState(false);
   const [confirmingRemove, setConfirmingRemove] = useState(false);
   const [justReconnected, setJustReconnected] = useState<ConnectResult | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [editLabel, setEditLabel] = useState(account.label ?? '');
+  const [editRepoOwner, setEditRepoOwner] = useState(account.repoOwner ?? '');
 
   const remove = useMutation({
     mutationFn: () => api.delete<void>(`/api/git-accounts/${account.id}`),
     onSuccess: () => {
       setConfirmingRemove(false);
+      onChanged();
+    },
+  });
+
+  const update = useMutation({
+    mutationFn: () =>
+      api.patch<{ account: GitAccount }>(`/api/git-accounts/${account.id}`, {
+        label: editLabel.trim(),
+        repoOwner: editRepoOwner.trim(),
+      }),
+    onSuccess: () => {
+      setEditing(false);
       onChanged();
     },
   });
@@ -657,6 +673,21 @@ function AccountRow({
           <span className={`pill ${account.status === 'valid' ? 'pill-ok' : 'pill-critical'}`}>
             {account.status === 'valid' ? 'Connected' : 'Reconnect needed'}
           </span>
+          {canManage && (
+            <button
+              type="button"
+              className="icon-btn"
+              title="Edit label / owner filter"
+              aria-label="Edit label / owner filter"
+              onClick={() => {
+                setEditLabel(account.label ?? '');
+                setEditRepoOwner(account.repoOwner ?? '');
+                setEditing((current) => !current);
+              }}
+            >
+              <IconFilter />
+            </button>
+          )}
           {canManage && (
             <button
               type="button"
@@ -711,6 +742,56 @@ function AccountRow({
             ? remove.error.message
             : 'Could not remove this account.'}
         </p>
+      )}
+
+      {editing && (
+        <div className="stack">
+          <div>
+            <label htmlFor={`edit-label-${account.id}`}>Label</label>
+            <input
+              id={`edit-label-${account.id}`}
+              type="text"
+              value={editLabel}
+              placeholder="e.g. Org: Soft IT UG"
+              onChange={(event) => setEditLabel(event.target.value)}
+            />
+          </div>
+          {account.provider === 'github' && (
+            <div>
+              <label htmlFor={`edit-owner-${account.id}`}>Only show repos owned by</label>
+              <input
+                id={`edit-owner-${account.id}`}
+                type="text"
+                value={editRepoOwner}
+                placeholder="e.g. your-org-slug"
+                onChange={(event) => setEditRepoOwner(event.target.value)}
+              />
+              <p className="field-hint">
+                Filters the import list to repos owned by this login — set this
+                for a token scoped to an organization, since GitHub's
+                repository list can still include your own public repos.
+              </p>
+            </div>
+          )}
+          {update.isError && (
+            <p className="notice notice-error">
+              {update.error instanceof ApiError ? update.error.message : 'Could not save.'}
+            </p>
+          )}
+          <div className="row">
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={update.isPending}
+              onClick={() => update.mutate()}
+            >
+              {update.isPending ? 'Saving…' : 'Save'}
+            </button>
+            <button type="button" className="btn-quiet" onClick={() => setEditing(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
 
       {reconnecting && (

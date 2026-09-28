@@ -142,7 +142,9 @@ export function ImportDialog({
                     })()}
                   </span>
                   <span style={{ minWidth: 0 }}>
-                    <div className="account-name">{account.username}</div>
+                    <div className="account-name">
+                      {account.label ? `${account.label} (${account.username})` : account.username}
+                    </div>
                     <div className="account-provider">
                       {PROVIDER_LABEL[account.provider] ?? account.provider}
                     </div>

@@ -21,6 +21,7 @@ export interface PublicGitAccount {
   baseUrl: string | null;
   username: string;
   label: string | null;
+  repoOwner: string | null;
   scopes: string[];
   status: string;
   connectedAt: number;
@@ -34,6 +35,7 @@ export function toPublicAccount(account: GitAccount): PublicGitAccount {
     baseUrl: account.baseUrl,
     username: account.username,
     label: account.label,
+    repoOwner: account.repoOwner,
     scopes: account.tokenScopes ?? [],
     status: account.status,
     connectedAt: account.connectedAt.getTime(),
@@ -77,6 +79,7 @@ export function createGitAccount(input: {
   baseUrl: string | null;
   username: string;
   label: string | null;
+  repoOwner: string | null;
   token: string;
   scopes: string[];
 }): GitAccount {
@@ -88,6 +91,7 @@ export function createGitAccount(input: {
       baseUrl: input.baseUrl,
       username: input.username,
       label: input.label,
+      repoOwner: input.repoOwner,
       tokenEncrypted: encrypt(input.token, config.encryptionKey),
       tokenScopes: input.scopes,
       status: 'valid',
@@ -115,6 +119,22 @@ export function reconnectGitAccount(
       status: 'valid',
       lastValidatedAt: new Date(),
     })
+    .where(eq(gitAccounts.id, id))
+    .returning()
+    .get();
+}
+
+/**
+ * Updates the label and/or owner filter on an existing account — no token
+ * involved, so this does not touch `status`/`lastValidatedAt`.
+ */
+export function updateGitAccount(
+  id: number,
+  input: { label: string | null; repoOwner: string | null },
+): GitAccount {
+  return db
+    .update(gitAccounts)
+    .set({ label: input.label, repoOwner: input.repoOwner })
     .where(eq(gitAccounts.id, id))
     .returning()
     .get();
