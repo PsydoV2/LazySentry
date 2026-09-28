@@ -17,9 +17,11 @@ const THEME_OPTIONS: { value: Theme; label: string; icon: typeof IconSun }[] = [
 export function UserMenu({
   user,
   onSignedOut,
+  collapsed = false,
 }: {
   user: CurrentUser;
   onSignedOut: () => void;
+  collapsed?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -89,15 +91,18 @@ export function UserMenu({
         className="sidebar-user-trigger"
         aria-haspopup="menu"
         aria-expanded={open}
+        title={collapsed ? `${user.username} (${user.role})` : undefined}
         onClick={() => setOpen((value) => !value)}
       >
         <span className="sidebar-user-avatar" aria-hidden="true">
           <IconUser />
         </span>
-        <span className="sidebar-user-text">
-          <span className="sidebar-user-name">{user.username}</span>
-          <span className="sidebar-user-role">{user.role}</span>
-        </span>
+        {!collapsed && (
+          <span className="sidebar-user-text">
+            <span className="sidebar-user-name">{user.username}</span>
+            <span className="sidebar-user-role">{user.role}</span>
+          </span>
+        )}
       </button>
     </div>
   );
