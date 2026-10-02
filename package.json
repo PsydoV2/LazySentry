@@ -12,5 +12,6 @@
     "build": "pnpm -r build",
     "test": "pnpm --filter @lazysentry/shared build && pnpm -r test",
     "typecheck": "pnpm --filter @lazysentry/shared build && pnpm -r typecheck"
+    test
   }
 }
